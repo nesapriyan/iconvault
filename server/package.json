@@ -1,0 +1,47 @@
+{
+  "name": "iconvault-server",
+  "version": "1.0.0",
+  "description": "IconVault Backend API & Processing Engine",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "seed": "tsx src/scripts/seed.ts",
+    "cli": "tsx src/scripts/cli.ts"
+  },
+  "dependencies": {
+    "@types/opentype.js": "^1.3.10",
+    "adm-zip": "^0.5.16",
+    "archiver": "^7.0.1",
+    "better-sqlite3": "^11.8.1",
+    "cors": "^2.8.5",
+    "dompurify": "^3.2.4",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "fantasticon": "^3.0.0",
+    "jsdom": "^26.0.0",
+    "multer": "^1.4.5-lts.1",
+    "opentype.js": "^2.0.0",
+    "svgo": "^3.3.2",
+    "wawoff2": "^2.0.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/archiver": "^6.0.3",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/cors": "^2.8.17",
+    "@types/dompurify": "^3.0.5",
+    "@types/express": "^4.17.21",
+    "@types/jsdom": "^21.1.7",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^20.17.19",
+    "@types/supertest": "^6.0.2",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}

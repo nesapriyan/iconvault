@@ -1,0 +1,17 @@
+{
+  "name": "iconvault",
+  "version": "1.0.0",
+  "description": "Production-quality icon management and SVG sprite & icon font generation tool",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -n \"SERVER,CLIENT\" -c \"blue.bold,magenta.bold\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix client && npm run build --prefix server",
+    "start": "NODE_ENV=production npm run start --prefix server",
+    "test": "npm run test --prefix server",
+    "seed": "npm run seed --prefix server",
+    "cli": "npm run cli --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

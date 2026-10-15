@@ -1,0 +1,17 @@
+node_modules
+client/node_modules
+server/node_modules
+client/dist
+server/dist
+dist
+storage
+storage/
+*.sqlite*
+*.db*
+*.log
+.DS_Store
+.env
+.env.local
+.tools
+.venv
+coverage

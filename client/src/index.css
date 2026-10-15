@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 221.2 83.2% 53.3%;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 7%;
+    --card-foreground: 0 0% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 224.3 76.3% 48%;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 150, 150, 0.25);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(150, 150, 150, 0.4);
+}
+
+/* Checkerboard pattern for transparent SVG previews */
+.bg-checkerboard {
+  background-color: #f8fafc;
+  background-image: 
+    linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+    linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+    linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+}
+
+.dark .bg-checkerboard {
+  background-color: #18181b;
+  background-image: 
+    linear-gradient(45deg, #27272a 25%, transparent 25%),
+    linear-gradient(-45deg, #27272a 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #27272a 75%),
+    linear-gradient(-45deg, transparent 75%, #27272a 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+}
+
+/* Icon Rendering Modes: Natural, Flat, Wireframe */
+.svg-mode-natural {
+  /* Natural: No style overrides, completely original SVG as added */
+}
+
+/* Flat View: Solid flat color */
+.svg-mode-flat, .svg-recolor {
+  color: var(--icon-preview-color, currentColor);
+}
+
+.svg-mode-flat svg, .svg-recolor svg {
+  color: var(--icon-preview-color, currentColor);
+}
+
+.svg-mode-flat svg [fill]:not([fill="none"]),
+.svg-recolor svg [fill]:not([fill="none"]) {
+  fill: var(--icon-preview-color, currentColor) !important;
+}
+
+.svg-mode-flat svg [stroke]:not([stroke="none"]),
+.svg-recolor svg [stroke]:not([stroke="none"]) {
+  stroke: var(--icon-preview-color, currentColor) !important;
+}
+
+.svg-mode-flat svg:not([fill="none"]) :is(path, circle, rect, polygon, polyline, ellipse):not([fill="none"]):not([stroke]),
+.svg-recolor svg:not([fill="none"]) :is(path, circle, rect, polygon, polyline, ellipse):not([fill="none"]):not([stroke]) {
+  fill: var(--icon-preview-color, currentColor) !important;
+}
+
+/* Wireframe View: Vector outline blueprint mode */
+.svg-mode-wireframe {
+  color: var(--icon-preview-color, currentColor);
+}
+
+.svg-mode-wireframe svg {
+  color: var(--icon-preview-color, currentColor);
+}
+
+.svg-mode-wireframe svg :is(path, circle, rect, polygon, polyline, ellipse, line) {
+  fill: var(--icon-preview-color, currentColor) !important;
+  fill-opacity: 0.08 !important;
+  stroke: var(--icon-preview-color, currentColor) !important;
+  stroke-width: 1.25px !important;
+  stroke-linejoin: round !important;
+  stroke-linecap: round !important;
+  vector-effect: non-scaling-stroke !important;
+}
+
+.svg-mode-wireframe svg [fill="none"] {
+  fill: none !important;
+}

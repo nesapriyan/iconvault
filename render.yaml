@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: iconvault
+    env: node
+    plan: starter
+    region: oregon
+    buildCommand: npm install --prefix client && npm install --prefix server && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: PORT
+        value: 10000
+    disk:
+      name: iconvault-disk
+      mountPath: /var/data
+      sizeGB: 1

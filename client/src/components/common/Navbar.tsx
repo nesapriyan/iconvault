@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../context/AuthContext';
+import { AuthModal } from './AuthModal';
 import { UserManagementModal } from '../users/UserManagementModal';
 
 interface NavbarProps {
@@ -33,7 +34,8 @@ export function Navbar({
   onImportProject
 }: NavbarProps) {
   const { theme, toggleTheme } = useTheme();
-  const { currentUser, isAdmin, switchableUsers, switchUser } = useAuth();
+  const { currentUser, isAdmin, logout } = useAuth();
+  const [showAuth, setShowAuth] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showUserManagement, setShowUserManagement] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -159,16 +161,16 @@ export function Navbar({
             {/* User Profile & Role Switcher Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
-                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                onClick={() => currentUser ? setShowUserDropdown(!showUserDropdown) : setShowAuth(true)}
                 className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl border border-border hover:bg-secondary/70 transition-all text-left group"
-                title="Switch User / View Permissions"
+                title={currentUser ? "Account and permissions" : "Sign in"}
               >
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                   {initials}
                 </div>
                 <div className="hidden md:flex flex-col text-left">
                   <span className="text-xs font-semibold leading-tight text-foreground truncate max-w-[100px]">
-                    {currentUser?.name || 'User'}
+                    {currentUser?.name || 'Sign in'}
                   </span>
                   <span className="text-[10px] leading-tight text-muted-foreground flex items-center gap-1">
                     {isAdmin ? (
@@ -176,7 +178,7 @@ export function Navbar({
                         <ShieldCheck className="w-2.5 h-2.5 inline" /> Admin
                       </span>
                     ) : (
-                      <span>Member</span>
+                      <span>{currentUser ? 'Member' : 'Guest'}</span>
                     )}
                   </span>
                 </div>
@@ -194,7 +196,7 @@ export function Navbar({
                       </div>
                       <div className="min-w-0">
                         <div className="text-xs font-bold text-foreground truncate">
-                          {currentUser?.name}
+                          {currentUser?.name || 'Guest'}
                         </div>
                         <div className="text-[11px] text-muted-foreground truncate">
                           {currentUser?.email}
@@ -229,46 +231,14 @@ export function Navbar({
                     </button>
                   )}
 
-                  {/* Switch User Section */}
                   <div className="border-t border-border/60 pt-2">
-                    <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                      <span>Switch Profile (Quick Test)</span>
-                      <Sparkles className="w-3 h-3 text-amber-500" />
-                    </div>
-                    <div className="space-y-1 mt-1 max-h-48 overflow-y-auto">
-                      {switchableUsers.map((u) => {
-                        const isCurrent = u.id === currentUser?.id;
-                        return (
-                          <button
-                            key={u.id}
-                            onClick={async () => {
-                              if (!isCurrent) {
-                                await switchUser(u.id);
-                                setShowUserDropdown(false);
-                              }
-                            }}
-                            className={`w-full flex items-center justify-between px-2.5 py-2 text-xs rounded-xl transition-all text-left ${
-                              isCurrent
-                                ? 'bg-primary/10 text-primary font-semibold'
-                                : 'hover:bg-secondary text-foreground'
-                            }`}
-                          >
-                            <div className="min-w-0 pr-2">
-                              <div className="truncate font-medium flex items-center gap-1.5">
-                                <span>{u.name}</span>
-                                {u.role === 'admin' && (
-                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300 font-bold">
-                                    Admin
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[10px] text-muted-foreground truncate">{u.email}</div>
-                            </div>
-                            {isCurrent && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    {currentUser ? (
+                      <button className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-secondary"
+                        onClick={async () => { await logout(); setShowUserDropdown(false); onNavigateHome(); }}>Sign out</button>
+                    ) : (
+                      <button className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-secondary"
+                        onClick={() => { setShowAuth(true); setShowUserDropdown(false); }}>Sign in or create account</button>
+                    )}
                   </div>
                 </div>
               )}
@@ -277,6 +247,7 @@ export function Navbar({
         </div>
       </header>
 
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
       {/* Admin User Management Modal */}
       <UserManagementModal
         isOpen={showUserManagement}

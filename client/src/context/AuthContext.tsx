@@ -1,6 +1,7 @@
+import { getUser as identityUser, handleAuthCallback, onAuthChange } from '@netlify/identity';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User } from '../types';
-import { api, getAuthToken } from '../api/client';
+import { api } from '../api/client';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -33,6 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUser = useCallback(async () => {
     try {
+      if (!(await identityUser())) { setCurrentUser(null); return; }
       const user = await api.getMe();
       setCurrentUser(user);
     } catch (err) {
@@ -47,10 +49,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const init = async () => {
       setLoading(true);
+      try { await handleAuthCallback(); } catch (err) { console.warn('Could not confirm sign-in'); }
       await Promise.allSettled([refreshUser(), refreshSwitchableUsers()]);
       setLoading(false);
     };
     init();
+    const unsubscribe = onAuthChange(() => { refreshUser(); });
+    return unsubscribe;
   }, [refreshUser, refreshSwitchableUsers]);
 
   const login = async (email: string, password: string) => {
@@ -68,7 +73,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     await api.logout();
     setCurrentUser(null);
-    // Reload or reset to default demo account
     await refreshUser();
     await refreshSwitchableUsers();
   };

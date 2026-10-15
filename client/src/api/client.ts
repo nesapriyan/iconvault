@@ -1,30 +1,17 @@
+import { login as identityLogin, signup, logout as identityLogout, getUser as identityUser } from '@netlify/identity';
 import { Project, Folder, IconItem, BuildItem, SpriteBuildResponse, FontBuildResponse, User } from '../types';
 
 const API_BASE = '/api';
 
-let authToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('iconvault_token') : null;
+// Identity manages the session cookies and token refresh.
+export function setAuthToken(_token: string | null) { localStorage.removeItem('iconvault_token'); }
+export function getAuthToken(): string | null { return null; }
+export function getAuthHeaders(): Record<string, string> { return {}; }
 
-export function setAuthToken(token: string | null) {
-  authToken = token;
-  if (typeof window !== 'undefined') {
-    if (token) {
-      localStorage.setItem('iconvault_token', token);
-    } else {
-      localStorage.removeItem('iconvault_token');
-    }
-  }
-}
-
-export function getAuthToken(): string | null {
-  return authToken;
-}
-
-export function getAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {};
-  if (authToken) {
-    headers['Authorization'] = `Bearer ${authToken}`;
-  }
-  return headers;
+function unexpectedResponse(status: number): Error {
+  return new Error(status === 404
+    ? 'The API endpoint is unavailable. Please try again after the deployment finishes.'
+    : `The server returned an unexpected response (${status}). Please try again.`);
 }
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
@@ -39,8 +26,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 
   const contentType = res.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
-    const text = await res.text();
-    throw new Error(text || `Server error (${res.status} ${res.statusText})`);
+    throw unexpectedResponse(res.status);
   }
 
   const data = await res.json();
@@ -218,8 +204,7 @@ export const api = {
     });
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
-      const text = await res.text();
-      throw new Error(text || `Upload error (${res.status} ${res.statusText})`);
+      throw unexpectedResponse(res.status);
     }
     const data = await res.json();
     if (!res.ok || data.success === false) {
@@ -244,8 +229,7 @@ export const api = {
     });
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
-      const text = await res.text();
-      throw new Error(text || `Sprite import error (${res.status} ${res.statusText})`);
+      throw unexpectedResponse(res.status);
     }
     const data = await res.json();
     if (!res.ok || data.success === false) {
@@ -270,8 +254,7 @@ export const api = {
     });
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
-      const text = await res.text();
-      throw new Error(text || `Font import error (${res.status} ${res.statusText})`);
+      throw unexpectedResponse(res.status);
     }
     const data = await res.json();
     if (!res.ok || data.success === false) {
@@ -471,8 +454,7 @@ export const api = {
     });
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
-      const text = await res.text();
-      throw new Error(text || `Import error (${res.status} ${res.statusText})`);
+      throw unexpectedResponse(res.status);
     }
     const data = await res.json();
     if (!res.ok || data.success === false) {
@@ -527,21 +509,14 @@ export const api = {
 
   // Authentication
   async login(email: string, password: string): Promise<{ user: User; token: string }> {
-    const res = await fetchJson<{ user: User; token: string }>(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
-    setAuthToken(res.token);
-    return res;
+    await identityLogin(email, password);
+    return { user: await this.getMe(), token: '' };
   },
 
   async register(email: string, name: string, password: string): Promise<{ user: User; token: string }> {
-    const res = await fetchJson<{ user: User; token: string }>(`${API_BASE}/auth/register`, {
-      method: 'POST',
-      body: JSON.stringify({ email, name, password })
-    });
-    setAuthToken(res.token);
-    return res;
+    await signup(email, password, { full_name: name });
+    if (!(await identityUser())) throw new Error('Account created. Check your email to confirm your account, then sign in.');
+    return { user: await this.getMe(), token: '' };
   },
 
   async getMe(): Promise<User> {
@@ -549,23 +524,13 @@ export const api = {
   },
 
   async logout(): Promise<void> {
-    try {
-      await fetchJson(`${API_BASE}/auth/logout`, { method: 'POST' });
-    } catch {}
+    await identityLogout();
     setAuthToken(null);
   },
 
-  async getSwitchableUsers(): Promise<User[]> {
-    return fetchJson<User[]>(`${API_BASE}/auth/switchable-users`);
-  },
-
-  async switchUser(userId: string): Promise<{ user: User; token: string }> {
-    const res = await fetchJson<{ user: User; token: string }>(`${API_BASE}/auth/switch-user`, {
-      method: 'POST',
-      body: JSON.stringify({ userId })
-    });
-    setAuthToken(res.token);
-    return res;
+  async getSwitchableUsers(): Promise<User[]> { return []; },
+  async switchUser(_userId: string): Promise<{ user: User; token: string }> {
+    throw new Error('Sign out and sign in with the account you want to use.');
   },
 
   // User Management (Admin Only)

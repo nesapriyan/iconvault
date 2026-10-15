@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "target": "ES2022", "lib": ["ES2022", "DOM", "DOM.Iterable"], "types": ["node"] },
+  "include": ["backend", "db", "netlify/functions", "drizzle.config.ts"]
+}

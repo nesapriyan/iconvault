@@ -1,6 +1,13 @@
 import { Project, Folder, IconItem, BuildItem, SpriteBuildResponse, FontBuildResponse, User } from '../types';
 
-const API_BASE = '/api';
+const API_BASE = ((import.meta as any).env?.VITE_API_URL as string) || '/api';
+
+function parseNonJsonResponse(res: Response, text: string, defaultAction = 'Request'): Error {
+  if (text.trim().startsWith('<') || res.status === 404 || res.status === 502 || res.status === 503) {
+    return new Error(`Backend server not reachable (${res.status} ${res.statusText}). If you are hosting on a static platform like Netlify, deploy the full-stack Node.js server on Render.com or Railway.`);
+  }
+  return new Error(text || `${defaultAction} error (${res.status} ${res.statusText})`);
+}
 
 let authToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('iconvault_token') : null;
 
@@ -40,7 +47,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const contentType = res.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
     const text = await res.text();
-    throw new Error(text || `Server error (${res.status} ${res.statusText})`);
+    throw parseNonJsonResponse(res, text, 'Server');
   }
 
   const data = await res.json();
@@ -219,7 +226,7 @@ export const api = {
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       const text = await res.text();
-      throw new Error(text || `Upload error (${res.status} ${res.statusText})`);
+      throw parseNonJsonResponse(res, text, 'Upload');
     }
     const data = await res.json();
     if (!res.ok || data.success === false) {
@@ -245,7 +252,7 @@ export const api = {
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       const text = await res.text();
-      throw new Error(text || `Sprite import error (${res.status} ${res.statusText})`);
+      throw parseNonJsonResponse(res, text, 'Sprite import');
     }
     const data = await res.json();
     if (!res.ok || data.success === false) {
@@ -271,7 +278,7 @@ export const api = {
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       const text = await res.text();
-      throw new Error(text || `Font import error (${res.status} ${res.statusText})`);
+      throw parseNonJsonResponse(res, text, 'Font import');
     }
     const data = await res.json();
     if (!res.ok || data.success === false) {
@@ -472,7 +479,7 @@ export const api = {
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       const text = await res.text();
-      throw new Error(text || `Import error (${res.status} ${res.statusText})`);
+      throw parseNonJsonResponse(res, text, 'Import');
     }
     const data = await res.json();
     if (!res.ok || data.success === false) {

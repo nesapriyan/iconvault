@@ -428,8 +428,8 @@ export function DashboardView({
             </div>
           </div>
 
-          {/* Part 1: Projects Section */}
-          {(searchTab === 'all' || searchTab === 'projects') && (
+          {/* Part 1: Projects Section - shown if in 'projects' tab or (in 'all' tab with matching projects) */}
+          {((searchTab === 'all' && filteredProjects.length > 0) || searchTab === 'projects') && (
             <div>
               <div className="flex items-center justify-between mb-3.5">
                 <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -456,16 +456,26 @@ export function DashboardView({
                   ))}
                 </div>
               ) : (
-                <div className="p-6 rounded-2xl bg-secondary/30 border border-dashed border-border/80 text-center text-xs text-muted-foreground">
-                  No projects matching &ldquo;{search}&rdquo;
+                <div className="p-8 rounded-2xl bg-card border border-dashed border-border text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+                  <FolderKanban className="w-6 h-6 text-muted-foreground/60" />
+                  <p>No projects matching &ldquo;{search}&rdquo;.</p>
+                  {iconResults.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchTab('icons')}
+                      className="mt-2 text-xs text-primary font-semibold hover:underline cursor-pointer"
+                    >
+                      View {iconResults.length} matching icon{iconResults.length === 1 ? '' : 's'} &rarr;
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           )}
 
-          {/* Part 2: Icons Section */}
-          {(searchTab === 'all' || searchTab === 'icons') && (
-            <div className={searchTab === 'all' ? 'mt-2' : ''}>
+          {/* Part 2: Icons Section - shown if in 'icons' tab or (in 'all' tab with loading/matching icons) */}
+          {((searchTab === 'all' && (loadingIcons || iconResults.length > 0)) || searchTab === 'icons') && (
+            <div className={searchTab === 'all' && filteredProjects.length > 0 ? 'mt-8' : ''}>
               <div className="flex items-center justify-between mb-3.5">
                 <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-purple-500" />
@@ -495,28 +505,37 @@ export function DashboardView({
                   ))}
                 </div>
               ) : (
-                <div className="p-8 rounded-2xl bg-secondary/30 border border-dashed border-border/80 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+                <div className="p-8 rounded-2xl bg-card border border-dashed border-border text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
                   <Sparkles className="w-6 h-6 text-muted-foreground/60" />
-                  <p>No icons found matching &ldquo;{search}&rdquo; across any accessible project.</p>
+                  <p>No icons found matching &ldquo;{search}&rdquo;.</p>
+                  {filteredProjects.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchTab('projects')}
+                      className="mt-2 text-xs text-primary font-semibold hover:underline cursor-pointer"
+                    >
+                      View {filteredProjects.length} matching project{filteredProjects.length === 1 ? '' : 's'} &rarr;
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           )}
 
-          {/* Completely empty state if neither has results */}
+          {/* Unified empty state when neither projects nor icons have results */}
           {filteredProjects.length === 0 && iconResults.length === 0 && !loadingIcons && (
-            <div className="text-center py-12 bg-card border border-dashed border-border rounded-3xl p-8 max-w-md mx-auto">
-              <div className="w-12 h-12 rounded-2xl bg-secondary mx-auto flex items-center justify-center text-muted-foreground mb-3">
-                <Search className="w-6 h-6" />
+            <div className="text-center py-16 bg-card border border-dashed border-border rounded-3xl p-8 max-w-md mx-auto shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-secondary/80 mx-auto flex items-center justify-center text-muted-foreground mb-4">
+                <Search className="w-7 h-7 text-muted-foreground/80" />
               </div>
-              <h3 className="text-base font-bold text-foreground">No matches found</h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                We couldn&apos;t find any projects or icons matching &ldquo;{search}&rdquo;.
+              <h3 className="text-base font-bold text-foreground">No data found</h3>
+              <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                No projects or icons found matching &ldquo;<span className="font-semibold text-foreground">{search.trim()}</span>&rdquo;.
               </p>
               <button
                 type="button"
                 onClick={() => setSearch('')}
-                className="mt-4 px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-xs font-semibold text-foreground border border-border transition-colors cursor-pointer"
+                className="mt-5 px-5 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-xs font-semibold text-foreground border border-border transition-all cursor-pointer active:scale-95 shadow-xs"
               >
                 Clear Search
               </button>

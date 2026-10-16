@@ -9,6 +9,12 @@ export interface User {
   updated_at: string;
 }
 
+export interface SampleIcon {
+  id: string;
+  name: string;
+  rawSvg: string;
+}
+
 export interface Project {
   id: string;
   owner_id?: string | null;
@@ -32,6 +38,7 @@ export interface Project {
   last_build_at?: string | null;
   created_at: string;
   updated_at: string;
+  sample_icons?: SampleIcon[];
 }
 
 export interface Folder {

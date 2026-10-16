@@ -64,6 +64,17 @@ describe('IconVault REST API', () => {
     expect(res.body.data.icon.folder_id).toBe(createdFolderId);
   });
 
+  it('GET /api/projects should include sample_icons on each project', async () => {
+    const res = await request(app).get('/api/projects');
+    expect(res.status).toBe(200);
+    const proj = res.body.data.find((p: any) => p.id === createdProjectId);
+    expect(proj).toBeDefined();
+    expect(Array.isArray(proj.sample_icons)).toBe(true);
+    expect(proj.sample_icons.length).toBeGreaterThanOrEqual(1);
+    expect(proj.sample_icons[0].name).toBe('Triangle');
+    expect(proj.sample_icons[0].rawSvg).toContain('<svg');
+  });
+
   it('POST /api/projects/:id/build/sprite should build a sprite', async () => {
     const res = await request(app)
       .post(`/api/projects/${createdProjectId}/build/sprite`)

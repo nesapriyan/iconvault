@@ -43,8 +43,22 @@ router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
     }
 
     const folders = FolderRepo.findByProject(project.id);
-    const { total: iconCount } = IconRepo.findMany(project.id, { includeDeleted: false });
+    const { total: iconCount, icons: sampleIconRecords } = IconRepo.findMany(project.id, { limit: 5, includeDeleted: false });
     const { total: trashCount } = IconRepo.findMany(project.id, { includeDeleted: true });
+
+    const sample_icons = sampleIconRecords.map(icon => {
+      let rawSvg = '';
+      try {
+        rawSvg = StorageService.readIconSvg(icon.svg_path);
+      } catch {
+        rawSvg = '';
+      }
+      return {
+        id: icon.id,
+        name: icon.name,
+        rawSvg
+      };
+    });
 
     res.json({
       success: true,
@@ -55,7 +69,8 @@ router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
         can_manage: Permissions.canManage(req.user, project),
         folderCount: folders.length,
         iconCount,
-        trashCount
+        trashCount,
+        sample_icons
       }
     });
   } catch (err) {

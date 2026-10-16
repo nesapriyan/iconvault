@@ -222,10 +222,77 @@ export function ProjectCard({
             </span>
           )}
         </div>
+
+        {/* Line 4: Sample Icons Preview */}
+        <div className="mt-4 pt-3 border-t border-border/50">
+          <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground mb-2">
+            <span className="flex items-center gap-1.5 font-semibold text-foreground/85">
+              <span>Sample Icons</span>
+              {project.sample_icons && project.sample_icons.length > 0 && (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-secondary font-mono text-muted-foreground">
+                  {project.sample_icons.length}
+                </span>
+              )}
+            </span>
+            {project.icon_count !== undefined && project.icon_count > (project.sample_icons?.length || 0) && (
+              <span className="text-[10px] text-muted-foreground/75 font-medium">
+                +{project.icon_count - (project.sample_icons?.length || 0)} more
+              </span>
+            )}
+          </div>
+
+          {project.sample_icons && project.sample_icons.length > 0 ? (
+            <div className="grid grid-cols-5 gap-2">
+              {(() => {
+                const hasMoreThan5 = (project.icon_count || 0) > 5;
+                const displayed = hasMoreThan5
+                  ? project.sample_icons.slice(0, 4)
+                  : project.sample_icons.slice(0, 5);
+                const overflowCount = (project.icon_count || 0) - displayed.length;
+
+                return (
+                  <>
+                    {displayed.map((icon) => (
+                      <div
+                        key={icon.id}
+                        title={icon.name}
+                        className="aspect-square rounded-xl bg-secondary/50 hover:bg-secondary border border-border/60 hover:border-blue-500/50 p-2 flex items-center justify-center transition-all duration-150 group/icon relative overflow-hidden"
+                      >
+                        <div
+                          className="w-full h-full flex items-center justify-center text-foreground group-hover/icon:text-blue-500 transition-colors [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full svg-recolor"
+                          dangerouslySetInnerHTML={{ __html: icon.rawSvg || '' }}
+                        />
+                      </div>
+                    ))}
+                    {hasMoreThan5 && (
+                      <div
+                        title={`View all ${project.icon_count} icons`}
+                        className="aspect-square rounded-xl bg-secondary/70 hover:bg-secondary border border-border/70 hover:border-blue-500/50 flex flex-col items-center justify-center text-[11px] font-bold text-muted-foreground group-hover:text-blue-500 transition-all cursor-pointer"
+                      >
+                        <span>+{overflowCount}</span>
+                      </div>
+                    )}
+                    {!hasMoreThan5 &&
+                      Array.from({ length: 5 - displayed.length }).map((_, idx) => (
+                        <div
+                          key={`empty-${idx}`}
+                          className="aspect-square rounded-xl border border-dashed border-border/30 bg-secondary/5 flex items-center justify-center opacity-30"
+                        />
+                      ))}
+                  </>
+                );
+              })()}
+            </div>
+          ) : (
+            <div className="py-2.5 px-3 rounded-xl bg-secondary/20 border border-dashed border-border/50 flex items-center justify-center text-[11px] text-muted-foreground/60 gap-1.5 select-none">
+              <span>No icons added yet</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Footer Metrics */}
-      <div className="mt-5 pt-3.5 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
+      <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5 font-medium text-foreground">
           <Layers className="w-3.5 h-3.5 text-blue-500" />
           <span>{project.icon_count ?? 0} icons</span>

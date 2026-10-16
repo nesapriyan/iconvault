@@ -709,6 +709,66 @@ export function ProjectManagementModal({
                         <span>Created {new Date(project.created_at).toLocaleDateString()}</span>
                       </div>
 
+                      {/* Sample Icons Preview */}
+                      <div className="mt-2.5 pt-2 border-t border-border/50">
+                        <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/75 mb-1.5">
+                          <span>Sample Icons</span>
+                          {project.icon_count !== undefined && project.icon_count > (project.sample_icons?.length || 0) && (
+                            <span className="font-normal capitalize text-muted-foreground">
+                              +{project.icon_count - (project.sample_icons?.length || 0)} more
+                            </span>
+                          )}
+                        </div>
+
+                        {project.sample_icons && project.sample_icons.length > 0 ? (
+                          <div className="grid grid-cols-5 gap-1.5">
+                            {(() => {
+                              const hasMoreThan5 = (project.icon_count || 0) > 5;
+                              const displayed = hasMoreThan5
+                                ? project.sample_icons.slice(0, 4)
+                                : project.sample_icons.slice(0, 5);
+                              const remaining = (project.icon_count || 0) - displayed.length;
+
+                              return (
+                                <>
+                                  {displayed.map((icon) => (
+                                    <div
+                                      key={icon.id}
+                                      title={icon.name}
+                                      className="aspect-square rounded-lg bg-secondary/60 hover:bg-secondary border border-border/60 hover:border-primary/40 p-1.5 flex items-center justify-center transition-all group/icon"
+                                    >
+                                      <div
+                                        className="w-full h-full flex items-center justify-center text-foreground group-hover/icon:text-primary transition-colors [&>svg]:w-full [&>svg]:h-full svg-recolor"
+                                        dangerouslySetInnerHTML={{ __html: icon.rawSvg || '' }}
+                                      />
+                                    </div>
+                                  ))}
+                                  {hasMoreThan5 && (
+                                    <div
+                                      title={`+${remaining} more icons in this project`}
+                                      className="aspect-square rounded-lg bg-secondary/80 border border-border/80 flex items-center justify-center text-[10px] font-bold text-muted-foreground"
+                                    >
+                                      +{remaining}
+                                    </div>
+                                  )}
+                                  {!hasMoreThan5 &&
+                                    Array.from({ length: 5 - displayed.length }).map((_, idx) => (
+                                      <div
+                                        key={`empty-${idx}`}
+                                        className="aspect-square rounded-lg border border-dashed border-border/30 bg-secondary/10 opacity-30"
+                                      />
+                                    ))}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        ) : (
+                          <div className="py-1.5 px-2 rounded-lg bg-secondary/20 border border-dashed border-border/50 text-center text-[10px] text-muted-foreground/60">
+                            No icons in project
+                          </div>
+                        )}
+                      </div>
+
                       {/* Owner Information Box (Prominent) */}
                       <div className="mt-3 p-2.5 rounded-xl bg-secondary/50 border border-border/70 flex items-center justify-between gap-2">
                         <button

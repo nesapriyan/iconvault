@@ -2,6 +2,13 @@ import crypto from 'crypto';
 import { getDatabase } from '../connection.js';
 import { UserRecord, UserSafe } from './userRepo.js';
 import { Permissions } from '../../utils/permissions.js';
+import { StorageService } from '../../services/storageService.js';
+
+export interface SampleIcon {
+  id: string;
+  name: string;
+  rawSvg: string;
+}
 
 export interface ProjectRecord {
   id: string;
@@ -27,6 +34,7 @@ export interface ProjectWithStats extends ProjectRecord {
   can_add_icons?: boolean;
   can_edit?: boolean;
   can_manage?: boolean;
+  sample_icons?: SampleIcon[];
 }
 
 export const ProjectRepo = {
@@ -100,12 +108,46 @@ export const ProjectRepo = {
 
     const rows = db.prepare(query).all(...params) as ProjectWithStats[];
 
-    // Compute permissions for caller
+    // Fetch up to 5 sample icons per project for preview
+    const sampleIconsByProject: Record<string, SampleIcon[]> = {};
+    if (rows.length > 0) {
+      const placeholders = rows.map(() => '?').join(',');
+      const sampleRows = db.prepare(`
+        SELECT id, project_id, name, svg_path
+        FROM (
+          SELECT id, project_id, name, svg_path,
+                 ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY created_at ASC) as rn
+          FROM icons
+          WHERE deleted_at IS NULL AND project_id IN (${placeholders})
+        )
+        WHERE rn <= 5
+      `).all(...rows.map(r => r.id)) as { id: string; project_id: string; name: string; svg_path: string }[];
+
+      for (const s of sampleRows) {
+        if (!sampleIconsByProject[s.project_id]) {
+          sampleIconsByProject[s.project_id] = [];
+        }
+        let rawSvg = '';
+        try {
+          rawSvg = StorageService.readIconSvg(s.svg_path);
+        } catch {
+          rawSvg = '';
+        }
+        sampleIconsByProject[s.project_id].push({
+          id: s.id,
+          name: s.name,
+          rawSvg
+        });
+      }
+    }
+
+    // Compute permissions and attach sample icons for caller
     return rows.map(p => ({
       ...p,
       can_add_icons: Permissions.canAddIcons(options.user, p),
       can_edit: Permissions.canEdit(options.user, p),
-      can_manage: Permissions.canManage(options.user, p)
+      can_manage: Permissions.canManage(options.user, p),
+      sample_icons: sampleIconsByProject[p.id] || []
     }));
   },
 

@@ -48,9 +48,10 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
   const [deleteRecipientId, setDeleteRecipientId] = useState<string>('');
   const [deletingUser, setDeletingUser] = useState(false);
 
-  // Standalone transfer projects modal state
-  const [userToTransfer, setUserToTransfer] = useState<UserType | null>(null);
-  const [standaloneRecipientId, setStandaloneRecipientId] = useState<string>('');
+  // Transfer projects modal state (available for all users)
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferSourceUserId, setTransferSourceUserId] = useState<string>('');
+  const [transferTargetUserId, setTransferTargetUserId] = useState<string>('');
   const [transferringProjects, setTransferringProjects] = useState(false);
 
   const fetchUsers = useCallback(async () => {
@@ -72,7 +73,9 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
       setIsEditing(false);
       setEditingUserId(null);
       setUserToDelete(null);
-      setUserToTransfer(null);
+      setIsTransferModalOpen(false);
+      setTransferSourceUserId('');
+      setTransferTargetUserId('');
       setError(null);
       setSuccessMsg(null);
     }
@@ -194,24 +197,49 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
     }
   };
 
-  const handleOpenTransfer = (user: UserType) => {
-    setUserToTransfer(user);
-    const otherUsers = users.filter((u) => u.id !== user.id);
-    const defaultRecipient = otherUsers.find((u) => u.role === 'admin') || otherUsers[0];
-    setStandaloneRecipientId(defaultRecipient?.id || '');
+  const handleOpenTransfer = (user?: UserType) => {
+    if (user) {
+      setTransferSourceUserId(user.id);
+      const otherUsers = users.filter((u) => u.id !== user.id);
+      const defaultRecipient = otherUsers.find((u) => u.role === 'admin') || otherUsers[0];
+      setTransferTargetUserId(defaultRecipient?.id || '');
+    } else {
+      const userWithProjects = users.find((u) => (u.project_count || 0) > 0) || users[0];
+      const defaultSrcId = userWithProjects?.id || '';
+      setTransferSourceUserId(defaultSrcId);
+      const otherUsers = users.filter((u) => u.id !== defaultSrcId);
+      const defaultRecipient = otherUsers.find((u) => u.role === 'admin') || otherUsers[0];
+      setTransferTargetUserId(defaultRecipient?.id || '');
+    }
+    setIsTransferModalOpen(true);
+  };
+
+  const handleSwapTransferUsers = () => {
+    if (!transferSourceUserId || !transferTargetUserId) return;
+    const oldSrc = transferSourceUserId;
+    const oldTarget = transferTargetUserId;
+    setTransferSourceUserId(oldTarget);
+    setTransferTargetUserId(oldSrc);
   };
 
   const handleExecuteTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userToTransfer || !standaloneRecipientId) return;
+    if (!transferSourceUserId || !transferTargetUserId) return;
+
+    const sourceUser = users.find((u) => u.id === transferSourceUserId);
+    const targetUser = users.find((u) => u.id === transferTargetUserId);
+
+    if (!sourceUser || (sourceUser.project_count || 0) === 0) {
+      setError(`User "${sourceUser?.name || 'Selected user'}" currently owns 0 projects.`);
+      return;
+    }
 
     try {
       setTransferringProjects(true);
       setError(null);
-      const res = await api.transferUserProjects(userToTransfer.id, standaloneRecipientId);
-      const recipientUser = users.find((u) => u.id === standaloneRecipientId);
-      setSuccessMsg(`Successfully transferred ${res.transferredCount} project(s) from "${userToTransfer.name}" to "${recipientUser?.name || res.newOwnerName}".`);
-      setUserToTransfer(null);
+      const res = await api.transferUserProjects(transferSourceUserId, transferTargetUserId);
+      setSuccessMsg(`Successfully transferred ${res.transferredCount} project(s) from "${sourceUser.name}" to "${targetUser?.name || res.newOwnerName}".`);
+      setIsTransferModalOpen(false);
       await fetchUsers();
     } catch (err: any) {
       setError(err?.message || 'Failed to transfer user projects');
@@ -219,6 +247,7 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
       setTransferringProjects(false);
     }
   };
+
 
 
   const filteredUsers = users.filter(u => 
@@ -414,13 +443,24 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
                     className="w-full pl-9 pr-3.5 py-1.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
-                <button
-                  onClick={handleOpenAdd}
-                  className="px-4 py-2 text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-colors flex items-center justify-center gap-2"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>Add New User</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenTransfer()}
+                    className="px-3.5 py-2 text-sm font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-95"
+                    title="Transfer projects between any users"
+                  >
+                    <ArrowLeftRight className="w-4 h-4 text-indigo-500" />
+                    <span>Transfer Projects</span>
+                  </button>
+                  <button
+                    onClick={handleOpenAdd}
+                    className="px-4 py-2 text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>Add New User</span>
+                  </button>
+                </div>
               </div>
 
               {/* Users Table */}
@@ -501,22 +541,22 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
 
                             <td className="py-3.5 px-4 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1.5">
-                                {(u.project_count || 0) > 0 && (
-                                  <button
-                                    onClick={() => handleOpenTransfer(u)}
-                                    className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 dark:hover:text-indigo-400 transition-colors"
-                                    title={`Transfer all ${u.project_count} project(s) to another user`}
-                                  >
-                                    <ArrowLeftRight className="w-4 h-4" />
-                                  </button>
-                                )}
+                                {/* Transfer option available for all users */}
+                                <button
+                                  onClick={() => handleOpenTransfer(u)}
+                                  className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+                                  title={`Transfer projects for ${u.name} (${u.project_count || 0} owned)`}
+                                >
+                                  <ArrowLeftRight className="w-4 h-4" />
+                                </button>
                                 <button
                                   onClick={() => handleOpenEdit(u)}
-                                  className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 dark:hover:text-indigo-400 transition-colors"
+                                  className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 dark:hover:text-indigo-400 transition-colors cursor-pointer"
                                   title="Edit user & permissions"
                                 >
                                   <Edit3 className="w-4 h-4" />
                                 </button>
+
                                 <button
                                   onClick={() => handleInitiateDelete(u)}
                                   disabled={isSelf}
@@ -675,80 +715,144 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
             );
           })()}
 
-          {/* Standalone Transfer Projects Dialog */}
-          {userToTransfer && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-              <div 
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 flex items-center justify-center shrink-0">
-                    <ArrowLeftRight className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Transfer All Projects</h3>
-                    <p className="text-xs text-slate-500">Reassign ownership to another user</p>
-                  </div>
-                </div>
+          {/* Standalone Transfer Projects Dialog (supports any user) */}
+          {isTransferModalOpen && (() => {
+            const sourceUser = users.find((u) => u.id === transferSourceUserId);
+            const targetUser = users.find((u) => u.id === transferTargetUserId);
+            const sourceProjects = sourceUser?.project_count || 0;
 
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Transfer all <strong>{userToTransfer.project_count || 0} project(s)</strong> owned by{' '}
-                  <strong>{userToTransfer.name}</strong> ({userToTransfer.email}) to another user:
-                </p>
+            return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+                <div 
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl max-w-lg w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 flex items-center justify-center shrink-0">
+                      <ArrowLeftRight className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">Transfer All Projects</h3>
+                      <p className="text-xs text-slate-500">Reassign project ownership between users</p>
+                    </div>
+                  </div>
 
-                <form onSubmit={handleExecuteTransfer} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
-                      Select Recipient User
-                    </label>
-                    <select
-                      value={standaloneRecipientId}
-                      onChange={(e) => setStandaloneRecipientId(e.target.value)}
-                      required
-                      className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      {users
-                        .filter((u) => u.id !== userToTransfer.id)
-                        .map((u) => (
+                  <form onSubmit={handleExecuteTransfer} className="space-y-4">
+                    {/* Source User */}
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                        Transfer From (Current Owner)
+                      </label>
+                      <select
+                        value={transferSourceUserId}
+                        onChange={(e) => {
+                          const newSrc = e.target.value;
+                          setTransferSourceUserId(newSrc);
+                          if (transferTargetUserId === newSrc) {
+                            const fallback = users.find((u) => u.id !== newSrc);
+                            setTransferTargetUserId(fallback?.id || '');
+                          }
+                        }}
+                        required
+                        className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                      >
+                        {users.map((u) => (
                           <option key={u.id} value={u.id}>
-                            {u.name} ({u.email}) - {u.role === 'admin' ? 'Admin' : 'Member'}
+                            {u.name} ({u.project_count || 0} projects) - {u.role === 'admin' ? 'Admin' : 'Member'}
                           </option>
                         ))}
-                    </select>
-                  </div>
+                      </select>
+                    </div>
 
-                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                    <button
-                      type="button"
-                      onClick={() => setUserToTransfer(null)}
-                      disabled={transferringProjects}
-                      className="px-4 py-2 text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={transferringProjects || !standaloneRecipientId}
-                      className="px-4 py-2 text-sm font-medium rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-colors flex items-center gap-2"
-                    >
-                      {transferringProjects ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Transferring...</span>
-                        </>
-                      ) : (
-                        <>
-                          <ArrowLeftRight className="w-4 h-4" />
-                          <span>Transfer Projects</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
+                    {/* Swap Direction Button */}
+                    <div className="flex justify-center -my-1">
+                      <button
+                        type="button"
+                        onClick={handleSwapTransferUsers}
+                        className="px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs active:scale-95"
+                        title="Swap source and recipient"
+                      >
+                        <ArrowLeftRight className="w-3 h-3 text-indigo-500" />
+                        <span>Swap Direction</span>
+                      </button>
+                    </div>
+
+                    {/* Target User */}
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                        Transfer To (New Owner)
+                      </label>
+                      <select
+                        value={transferTargetUserId}
+                        onChange={(e) => setTransferTargetUserId(e.target.value)}
+                        required
+                        className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                      >
+                        {users
+                          .filter((u) => u.id !== transferSourceUserId)
+                          .map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name} ({u.email}) - {u.role === 'admin' ? 'Admin' : 'Member'}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    {/* Status Feedback Card */}
+                    {sourceProjects > 0 ? (
+                      <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/50 text-xs text-indigo-900 dark:text-indigo-200 flex items-start gap-2.5">
+                        <FolderGit2 className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>{sourceProjects} project{sourceProjects === 1 ? '' : 's'}</strong> owned by{' '}
+                          <strong>{sourceUser?.name}</strong> will be transferred to <strong>{targetUser?.name || 'recipient'}</strong>.
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2.5">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>{sourceUser?.name || 'Selected user'}</strong> does not currently own any projects.
+                          Choose a source user who owns projects or click <em>Swap Direction</em>.
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setIsTransferModalOpen(false)}
+                        disabled={transferringProjects}
+                        className="px-4 py-2 text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={transferringProjects || sourceProjects === 0 || !transferTargetUserId}
+                        className={`px-4 py-2 text-sm font-medium rounded-xl text-white shadow-sm transition-all flex items-center gap-2 ${
+                          sourceProjects === 0 || !transferTargetUserId
+                            ? 'bg-slate-300 dark:bg-slate-800 cursor-not-allowed opacity-60'
+                            : 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer active:scale-95'
+                        }`}
+                      >
+                        {transferringProjects ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Transferring...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ArrowLeftRight className="w-4 h-4" />
+                            <span>Transfer {sourceProjects > 0 ? `${sourceProjects} Project${sourceProjects === 1 ? '' : 's'}` : 'Projects'}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Footer */}

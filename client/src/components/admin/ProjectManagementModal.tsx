@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   X, 
   FolderKanban, 
@@ -18,7 +18,8 @@ import {
   MinusSquare, 
   AlertTriangle,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  ChevronDown
 } from 'lucide-react';
 import { Project, User } from '../../types';
 import { api } from '../../api/client';
@@ -46,7 +47,61 @@ export function ProjectManagementModal({
   const [search, setSearch] = useState('');
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
   const [purposeFilter, setPurposeFilter] = useState<'all' | 'sprite' | 'font'>('all');
-  const [ownerFilter, setOwnerFilter] = useState<string>('all');
+  // Multi-select for User / Owner filter
+  const [selectedOwnerIds, setSelectedOwnerIds] = useState<string[]>([]);
+  const [isUserFilterOpen, setIsUserFilterOpen] = useState(false);
+  const [userFilterSearch, setUserFilterSearch] = useState('');
+  const userFilterRef = useRef<HTMLDivElement>(null);
+
+  // Close multi-select user dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userFilterRef.current && !userFilterRef.current.contains(event.target as Node)) {
+        setIsUserFilterOpen(false);
+      }
+    }
+    if (isUserFilterOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isUserFilterOpen]);
+
+  const toggleOwnerSelection = (id: string) => {
+    setSelectedOwnerIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(x => x !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  const selectAllOwners = () => {
+    const allIds = users.map(u => u.id);
+    if (projects.some(p => !p.owner_id)) {
+      allIds.push('unassigned');
+    }
+    setSelectedOwnerIds(allIds);
+  };
+
+  const clearOwnerFilter = () => {
+    setSelectedOwnerIds([]);
+  };
+
+  const getOwnerFilterLabel = () => {
+    if (selectedOwnerIds.length === 0) {
+      return 'All Users';
+    }
+    if (selectedOwnerIds.length === 1) {
+      const singleId = selectedOwnerIds[0];
+      if (singleId === 'unassigned') return 'Unassigned';
+      const found = users.find(u => u.id === singleId);
+      return found ? found.name : '1 User';
+    }
+    return `${selectedOwnerIds.length} Users`;
+  };
 
   // Multi-selection for bulk operations
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -85,7 +140,9 @@ export function ProjectManagementModal({
       setSearch('');
       setVisibilityFilter('all');
       setPurposeFilter('all');
-      setOwnerFilter('all');
+      setSelectedOwnerIds([]);
+      setIsUserFilterOpen(false);
+      setUserFilterSearch('');
       setSelectedIds(new Set());
       setTransferTarget(null);
       setDeleteTarget(null);
@@ -103,11 +160,10 @@ export function ProjectManagementModal({
       // Purpose
       if (purposeFilter !== 'all' && (p.purpose || 'sprite') !== purposeFilter) return false;
 
-      // Owner / User
-      if (ownerFilter !== 'all') {
-        if (ownerFilter === 'unassigned') {
-          if (p.owner_id) return false;
-        } else if (p.owner_id !== ownerFilter) {
+      // Multi-select Owner / User filter
+      if (selectedOwnerIds.length > 0) {
+        const ownerKey = p.owner_id || 'unassigned';
+        if (!selectedOwnerIds.includes(ownerKey)) {
           return false;
         }
       }
@@ -123,7 +179,7 @@ export function ProjectManagementModal({
       }
       return true;
     }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [projects, search, visibilityFilter, purposeFilter, ownerFilter]);
+  }, [projects, search, visibilityFilter, purposeFilter, selectedOwnerIds]);
 
 
   // Counts for quick stats
@@ -314,39 +370,166 @@ export function ProjectManagementModal({
 
           {/* Right: User, Visibility & Format Filters */}
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Filter by User / Owner */}
-            <div className="flex items-center gap-1.5 bg-secondary/60 px-2.5 py-1 rounded-xl border border-border/80 text-xs">
-              <UserIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <select
-                value={ownerFilter}
-                onChange={e => setOwnerFilter(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-foreground focus:outline-none cursor-pointer pr-1 max-w-[150px] truncate"
-                title="Filter projects by user/owner"
+            {/* Multi-select User / Owner Filter Popover */}
+            <div className="relative" ref={userFilterRef}>
+              <button
+                type="button"
+                onClick={() => setIsUserFilterOpen(prev => !prev)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer select-none shadow-2xs ${
+                  selectedOwnerIds.length > 0
+                    ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/15'
+                    : 'bg-secondary/60 border-border/80 text-foreground hover:bg-secondary'
+                }`}
+                title="Filter projects by one or multiple users"
               >
-                <option value="all">All Users ({projects.length})</option>
-                {users.map(u => {
-                  const count = projects.filter(p => p.owner_id === u.id).length;
-                  return (
-                    <option key={u.id} value={u.id}>
-                      {u.name} ({count})
-                    </option>
-                  );
-                })}
-                {projects.some(p => !p.owner_id) && (
-                  <option value="unassigned">
-                    Unassigned ({projects.filter(p => !p.owner_id).length})
-                  </option>
+                <UserIcon className={`w-3.5 h-3.5 ${selectedOwnerIds.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className="max-w-[130px] truncate">{getOwnerFilterLabel()}</span>
+                {selectedOwnerIds.length > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0">
+                    {selectedOwnerIds.length}
+                  </span>
                 )}
-              </select>
-              {ownerFilter !== 'all' && (
+                <ChevronDown className={`w-3 h-3 text-muted-foreground transition-transform duration-200 ${isUserFilterOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Clear shortcut if filtered */}
+              {selectedOwnerIds.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setOwnerFilter('all')}
-                  className="p-0.5 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearOwnerFilter();
+                  }}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-secondary border border-border text-muted-foreground hover:text-foreground flex items-center justify-center shadow-xs cursor-pointer z-10"
                   title="Clear user filter"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-2.5 h-2.5" />
                 </button>
+              )}
+
+              {/* Multi-select dropdown popover */}
+              {isUserFilterOpen && (
+                <div className="absolute right-0 sm:right-auto sm:left-0 top-full mt-2 w-72 bg-popover text-popover-foreground border border-border rounded-2xl shadow-xl z-50 p-2 space-y-2 animate-in fade-in zoom-in-95 duration-150">
+                  {/* Search user */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={userFilterSearch}
+                      onChange={e => setUserFilterSearch(e.target.value)}
+                      placeholder="Filter users..."
+                      className="w-full pl-8 pr-7 py-1 rounded-lg bg-secondary/50 border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      autoFocus
+                    />
+                    {userFilterSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setUserFilterSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Quick Select All / Clear All bar */}
+                  <div className="flex items-center justify-between px-1 text-[11px] text-muted-foreground border-b border-border/60 pb-1.5">
+                    <button
+                      type="button"
+                      onClick={selectAllOwners}
+                      className="font-medium hover:text-primary transition-colors cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                    <span>•</span>
+                    <button
+                      type="button"
+                      onClick={clearOwnerFilter}
+                      className="font-medium hover:text-primary transition-colors cursor-pointer"
+                    >
+                      Reset (All Users)
+                    </button>
+                  </div>
+
+                  {/* Scrollable list of users */}
+                  <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
+                    {users
+                      .filter(u => 
+                        u.name.toLowerCase().includes(userFilterSearch.toLowerCase()) || 
+                        u.email.toLowerCase().includes(userFilterSearch.toLowerCase())
+                      )
+                      .map(u => {
+                        const isSelected = selectedOwnerIds.includes(u.id);
+                        const count = projects.filter(p => p.owner_id === u.id).length;
+                        const initial = (u.name || 'U')[0].toUpperCase();
+
+                        return (
+                          <div
+                            key={u.id}
+                            onClick={() => toggleOwnerSelection(u.id)}
+                            className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl text-xs cursor-pointer transition-colors ${
+                              isSelected
+                                ? 'bg-primary/10 text-primary font-medium'
+                                : 'hover:bg-secondary/60 text-foreground'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="text-muted-foreground shrink-0">
+                                {isSelected ? (
+                                  <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                                ) : (
+                                  <Square className="w-3.5 h-3.5 text-muted-foreground" />
+                                )}
+                              </div>
+                              <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-slate-600 to-slate-800 text-white flex items-center justify-center font-bold text-[9px] shrink-0">
+                                {initial}
+                              </div>
+                              <div className="min-w-0 truncate">
+                                <span className="truncate">{u.name}</span>
+                                {u.role === 'admin' && (
+                                  <span className="ml-1 text-[9px] px-1 py-0.2 rounded bg-purple-500/15 text-purple-600 dark:text-purple-400 font-semibold">
+                                    Admin
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              {count} proj
+                            </span>
+                          </div>
+                        );
+                      })}
+
+                    {/* Unassigned / System Option */}
+                    {('unassigned'.includes(userFilterSearch.toLowerCase()) || 'system'.includes(userFilterSearch.toLowerCase())) && (
+                      <div
+                        onClick={() => toggleOwnerSelection('unassigned')}
+                        className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl text-xs cursor-pointer transition-colors ${
+                          selectedOwnerIds.includes('unassigned')
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'hover:bg-secondary/60 text-foreground'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="text-muted-foreground shrink-0">
+                            {selectedOwnerIds.includes('unassigned') ? (
+                              <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                            ) : (
+                              <Square className="w-3.5 h-3.5 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="w-5 h-5 rounded-full bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold text-[9px] shrink-0">
+                            ⚙️
+                          </div>
+                          <span className="truncate">Unassigned / System</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {projects.filter(p => !p.owner_id).length} proj
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -519,7 +702,7 @@ export function ProjectManagementModal({
                       <div className="mt-3 p-2.5 rounded-xl bg-secondary/50 border border-border/70 flex items-center justify-between gap-2">
                         <button
                           type="button"
-                          onClick={() => setOwnerFilter(project.owner_id || 'unassigned')}
+                          onClick={() => setSelectedOwnerIds([project.owner_id || 'unassigned'])}
                           className="flex items-center gap-2 min-w-0 text-left hover:opacity-80 transition-opacity cursor-pointer group"
                           title={`Filter projects by ${project.owner_name || 'System / Unassigned'}`}
                         >
@@ -585,11 +768,11 @@ export function ProjectManagementModal({
               <FolderKanban className="w-8 h-8 mx-auto text-muted-foreground/60 mb-2" />
               <p className="font-semibold text-foreground">No projects found</p>
               <p className="mt-1">Try adjusting your search query or filters.</p>
-              {(ownerFilter !== 'all' || visibilityFilter !== 'all' || purposeFilter !== 'all' || search) && (
+              {(selectedOwnerIds.length > 0 || visibilityFilter !== 'all' || purposeFilter !== 'all' || search) && (
                 <button
                   type="button"
                   onClick={() => {
-                    setOwnerFilter('all');
+                    setSelectedOwnerIds([]);
                     setVisibilityFilter('all');
                     setPurposeFilter('all');
                     setSearch('');

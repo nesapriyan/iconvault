@@ -5,8 +5,9 @@ import { FolderRepo } from '../db/repositories/folderRepo.js';
 import { IconRepo } from '../db/repositories/iconRepo.js';
 import { StorageService } from '../services/storageService.js';
 import { createProjectSchema, updateProjectSchema } from '../utils/validation.js';
-import { NotFoundError, ForbiddenError } from '../utils/errors.js';
+import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors.js';
 import { Permissions } from '../utils/permissions.js';
+import { UserRepo } from '../db/repositories/userRepo.js';
 
 const router = Router();
 
@@ -161,6 +162,76 @@ router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
     StorageService.deleteProjectStorage(req.params.id);
 
     res.json({ success: true, message: 'Project deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Bulk delete projects (admin only)
+router.post('/bulk-delete', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      throw new ForbiddenError('Only administrators can perform bulk project deletions');
+    }
+
+    const { projectIds } = req.body;
+    if (!Array.isArray(projectIds) || projectIds.length === 0) {
+      throw new BadRequestError('projectIds array is required');
+    }
+
+    let deletedCount = 0;
+    for (const id of projectIds) {
+      const p = ProjectRepo.findById(id);
+      if (p) {
+        ProjectRepo.delete(id);
+        StorageService.deleteProjectStorage(id);
+        deletedCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      data: { deletedCount },
+      message: `Successfully deleted ${deletedCount} project(s)`
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Transfer project ownership to another user (owner or admin only)
+router.post('/:id/transfer', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const project = ProjectRepo.findById(req.params.id);
+    if (!project) throw new NotFoundError('Project not found');
+
+    if (!Permissions.canManage(req.user, project)) {
+      throw new ForbiddenError('Only the project owner or an administrator can transfer this project');
+    }
+
+    const { newOwnerId } = req.body;
+    if (!newOwnerId) {
+      throw new BadRequestError('newOwnerId is required');
+    }
+
+    const targetUser = UserRepo.findById(newOwnerId);
+    if (!targetUser) {
+      throw new NotFoundError('Target user not found');
+    }
+
+    const updated = ProjectRepo.update(req.params.id, {
+      owner_id: targetUser.id
+    });
+
+    res.json({
+      success: true,
+      data: {
+        ...updated,
+        owner_name: targetUser.name,
+        owner_email: targetUser.email
+      },
+      message: `Project transferred to ${targetUser.name} successfully`
+    });
   } catch (err) {
     next(err);
   }

@@ -165,6 +165,24 @@ describe('IconVault REST API', () => {
     expect(searchRes.body.data.icons[0].rawSvg).toContain('<svg');
   });
 
+  it('POST /api/projects/:id/transfer should transfer project ownership', async () => {
+    // Create another user to transfer to
+    const uniqueEmail = `transfer-${Date.now()}@example.com`;
+    const regRes = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Transfer Recipient', email: uniqueEmail, password: 'password123' });
+    const recipientId = regRes.body.data.user.id;
+
+    // Transfer project
+    const transferRes = await request(app)
+      .post(`/api/projects/${createdProjectId}/transfer`)
+      .send({ newOwnerId: recipientId });
+
+    expect(transferRes.status).toBe(200);
+    expect(transferRes.body.success).toBe(true);
+    expect(transferRes.body.data.owner_name).toBe('Transfer Recipient');
+  });
+
   it('DELETE /api/projects/:id should delete project and storage', async () => {
     const res = await request(app).delete(`/api/projects/${createdProjectId}`);
     expect(res.status).toBe(200);

@@ -84,6 +84,8 @@ function AppContent() {
         onNavigateHome={handleNavigateHome}
         onCreateProject={!activeProjectId ? () => setCreateModalOpen(true) : undefined}
         onImportProject={!activeProjectId ? () => setImportModalOpen(true) : undefined}
+        onRefreshProjects={loadProjects}
+        onOpenProject={handleOpenProject}
       />
 
       <main className="flex-1 w-full min-h-0 flex flex-col overflow-hidden">

@@ -147,6 +147,21 @@ export const api = {
     return fetchJson<Project>(`${API_BASE}/projects/${id}/duplicate`, { method: 'POST' });
   },
 
+  async transferProject(projectId: string, newOwnerId: string): Promise<Project> {
+    const res = await fetchJson<{ data: Project; message: string }>(`${API_BASE}/projects/${projectId}/transfer`, {
+      method: 'POST',
+      body: JSON.stringify({ newOwnerId })
+    });
+    return (res as any).data || res;
+  },
+
+  async bulkDeleteProjects(projectIds: string[]): Promise<{ deletedCount: number }> {
+    return fetchJson<{ deletedCount: number }>(`${API_BASE}/projects/bulk-delete`, {
+      method: 'POST',
+      body: JSON.stringify({ projectIds })
+    });
+  },
+
   // Folders
   async getFolders(projectId: string): Promise<Folder[]> {
     return fetchJson<Folder[]>(`${API_BASE}/projects/${projectId}/folders`);

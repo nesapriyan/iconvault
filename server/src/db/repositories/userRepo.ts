@@ -149,6 +149,17 @@ export const UserRepo = {
     return res.changes > 0;
   },
 
+  transferAllProjects(fromUserId: string, toUserId: string): number {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+    const res = db.prepare(`
+      UPDATE projects 
+      SET owner_id = ?, updated_at = ? 
+      WHERE owner_id = ?
+    `).run(toUserId, now, fromUserId);
+    return res.changes;
+  },
+
   // Sessions
   createSession(userId: string): { token: string; expiresAt: string } {
     const db = getDatabase();

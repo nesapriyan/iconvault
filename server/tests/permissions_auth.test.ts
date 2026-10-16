@@ -315,4 +315,91 @@ describe('Project Visibility & Permission Enforcement', () => {
     // Clean up
     await request(app).delete(`/api/projects/${aliceProjectId}`).set('Authorization', `Bearer ${member2Token}`);
   });
+
+  it('User Project Transfer: Admin can transfer all projects of a user to another user', async () => {
+    // 1. Create a user who owns projects
+    const testUserEmail = `transfer-src-${Date.now()}@iconvault.local`;
+    const userRes = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ email: testUserEmail, name: 'Transfer Source User', password: 'password123', role: 'user' });
+    expect(userRes.status).toBe(201);
+    const srcUserId = userRes.body.data.id;
+
+    // Login as srcUser to create a project
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: testUserEmail, password: 'password123' });
+    const srcToken = loginRes.body.data.token;
+
+    const projRes = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${srcToken}`)
+      .send({ name: 'Source User Project', visibility: 'public', prefix: 'src' });
+    expect(projRes.status).toBe(201);
+    const projId = projRes.body.data.id;
+
+    // 2. Transfer all projects to member (memberToken)
+    const transferRes = await request(app)
+      .post(`/api/users/${srcUserId}/transfer-projects`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ newOwnerId: 'usr-member-0000-0000-000000000002' });
+    expect(transferRes.status).toBe(200);
+    expect(transferRes.body.data.transferredCount).toBeGreaterThanOrEqual(1);
+
+    // Verify project owner updated
+    const checkProj = await request(app)
+      .get(`/api/projects/${projId}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(checkProj.body.data.owner_id).toBe('usr-member-0000-0000-000000000002');
+
+    // Clean up project
+    await request(app).delete(`/api/projects/${projId}`).set('Authorization', `Bearer ${adminToken}`);
+    await request(app).delete(`/api/users/${srcUserId}`).set('Authorization', `Bearer ${adminToken}`);
+  });
+
+  it('User Deletion with Project Transfer: Admin can delete a user and transfer projects simultaneously', async () => {
+    // 1. Create a temporary user with a project
+    const tempEmail = `del-transfer-${Date.now()}@iconvault.local`;
+    const userRes = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ email: tempEmail, name: 'Delete Transfer User', password: 'password123', role: 'user' });
+    const tempUserId = userRes.body.data.id;
+
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: tempEmail, password: 'password123' });
+    const tempToken = loginRes.body.data.token;
+
+    const projRes = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${tempToken}`)
+      .send({ name: 'Project To Be Transferred On Delete', visibility: 'public', prefix: 'del' });
+    const projId = projRes.body.data.id;
+
+    // 2. Delete the user and transfer all projects to admin
+    const delRes = await request(app)
+      .delete(`/api/users/${tempUserId}?transferTo=usr-admin-0000-0000-000000000001`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(delRes.status).toBe(200);
+    expect(delRes.body.data.transferredCount).toBeGreaterThanOrEqual(1);
+
+    // Verify user is deleted
+    const getUserRes = await request(app)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(getUserRes.body.data.find((u: any) => u.id === tempUserId)).toBeUndefined();
+
+    // Verify project still exists and is owned by admin
+    const checkProj = await request(app)
+      .get(`/api/projects/${projId}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(checkProj.status).toBe(200);
+    expect(checkProj.body.data.owner_id).toBe('usr-admin-0000-0000-000000000001');
+
+    // Clean up project
+    await request(app).delete(`/api/projects/${projId}`).set('Authorization', `Bearer ${adminToken}`);
+  });
 });
+

@@ -76,7 +76,34 @@ router.put('/:id', (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-// Delete user (Admin action)
+// Transfer all projects of a user to another user (Admin action)
+router.post('/:id/transfer-projects', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const targetUser = UserRepo.findById(req.params.id);
+    if (!targetUser) throw new NotFoundError('Source user not found');
+
+    const { newOwnerId } = req.body;
+    if (!newOwnerId) throw new BadRequestError('newOwnerId is required');
+    if (newOwnerId === targetUser.id) {
+      throw new BadRequestError('Cannot transfer projects to the same user');
+    }
+
+    const recipient = UserRepo.findById(newOwnerId);
+    if (!recipient) throw new NotFoundError('Recipient user not found');
+
+    const transferredCount = UserRepo.transferAllProjects(targetUser.id, recipient.id);
+
+    res.json({
+      success: true,
+      data: { transferredCount, newOwnerId: recipient.id, newOwnerName: recipient.name },
+      message: `Successfully transferred ${transferredCount} project(s) to ${recipient.name}`
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete user (Admin action, with optional project transfer)
 router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const targetUser = UserRepo.findById(req.params.id);
@@ -92,11 +119,34 @@ router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
       throw new BadRequestError('The primary system administrator account cannot be deleted');
     }
 
+    // Check for optional project transfer destination
+    const transferTo = (req.body?.transferTo || req.query?.transferTo) as string | undefined;
+    let transferredCount = 0;
+
+    if (transferTo && transferTo.trim().length > 0) {
+      const recipientId = transferTo.trim();
+      if (recipientId === targetUser.id) {
+        throw new BadRequestError('Cannot transfer projects to the user being deleted');
+      }
+      const recipient = UserRepo.findById(recipientId);
+      if (!recipient) {
+        throw new NotFoundError('Transfer recipient user not found');
+      }
+      transferredCount = UserRepo.transferAllProjects(targetUser.id, recipient.id);
+    }
+
     UserRepo.delete(req.params.id);
-    res.json({ success: true, message: 'User deleted successfully' });
+    res.json({
+      success: true,
+      message: transferredCount > 0
+        ? `User deleted and ${transferredCount} project(s) transferred successfully`
+        : 'User deleted successfully',
+      data: { transferredCount }
+    });
   } catch (err) {
     next(err);
   }
 });
 
 export default router;
+

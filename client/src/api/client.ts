@@ -639,7 +639,20 @@ export const api = {
     });
   },
 
-  async deleteUser(id: string): Promise<void> {
-    await fetchJson(`${API_BASE}/users/${id}`, { method: 'DELETE' });
+  async deleteUser(id: string, transferTo?: string): Promise<{ transferredCount?: number }> {
+    const query = transferTo ? `?transferTo=${encodeURIComponent(transferTo)}` : '';
+    return fetchJson<{ transferredCount?: number }>(`${API_BASE}/users/${id}${query}`, {
+      method: 'DELETE',
+      headers: transferTo ? { 'Content-Type': 'application/json' } : undefined,
+      body: transferTo ? JSON.stringify({ transferTo }) : undefined
+    });
+  },
+
+  async transferUserProjects(userId: string, newOwnerId: string): Promise<{ transferredCount: number; newOwnerName: string }> {
+    return fetchJson<{ transferredCount: number; newOwnerName: string }>(`${API_BASE}/users/${userId}/transfer-projects`, {
+      method: 'POST',
+      body: JSON.stringify({ newOwnerId })
+    });
   }
 };
+

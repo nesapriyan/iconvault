@@ -11,7 +11,10 @@ import {
   Check, 
   AlertCircle,
   Key,
-  FolderGit2
+  FolderGit2,
+  ArrowLeftRight,
+  Loader2,
+  AlertTriangle
 } from 'lucide-react';
 import { User as UserType } from '../../types';
 import { api } from '../../api/client';
@@ -39,8 +42,16 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
   const [formRole, setFormRole] = useState<'admin' | 'user'>('user');
   const [submitting, setSubmitting] = useState(false);
 
-  // Delete confirmation
+  // Delete confirmation & transfer on delete state
   const [userToDelete, setUserToDelete] = useState<UserType | null>(null);
+  const [transferOnDelete, setTransferOnDelete] = useState(true);
+  const [deleteRecipientId, setDeleteRecipientId] = useState<string>('');
+  const [deletingUser, setDeletingUser] = useState(false);
+
+  // Standalone transfer projects modal state
+  const [userToTransfer, setUserToTransfer] = useState<UserType | null>(null);
+  const [standaloneRecipientId, setStandaloneRecipientId] = useState<string>('');
+  const [transferringProjects, setTransferringProjects] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -61,10 +72,12 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
       setIsEditing(false);
       setEditingUserId(null);
       setUserToDelete(null);
+      setUserToTransfer(null);
       setError(null);
       setSuccessMsg(null);
     }
   }, [isOpen, fetchUsers]);
+
 
   if (!isOpen) return null;
 
@@ -147,20 +160,66 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
     }
   };
 
-  const handleDeleteUser = async (user: UserType) => {
+  const handleInitiateDelete = (user: UserType) => {
+    setUserToDelete(user);
+    const otherUsers = users.filter((u) => u.id !== user.id);
+    const defaultRecipient = otherUsers.find((u) => u.role === 'admin') || otherUsers[0];
+    setDeleteRecipientId(defaultRecipient?.id || '');
+    setTransferOnDelete((user.project_count || 0) > 0 && otherUsers.length > 0);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!userToDelete) return;
     try {
-      setLoading(true);
-      await api.deleteUser(user.id);
-      setSuccessMsg(`User "${user.name}" has been deleted`);
+      setDeletingUser(true);
+      setError(null);
+      const recipientId = transferOnDelete && (userToDelete.project_count || 0) > 0 ? deleteRecipientId : undefined;
+      const res = await api.deleteUser(userToDelete.id, recipientId);
+
+      const transferred = res?.transferredCount || 0;
+      if (transferred > 0) {
+        const recipientUser = users.find((u) => u.id === recipientId);
+        setSuccessMsg(`User "${userToDelete.name}" deleted and ${transferred} project(s) transferred to ${recipientUser?.name || 'recipient'}.`);
+      } else {
+        setSuccessMsg(`User "${userToDelete.name}" has been deleted successfully.`);
+      }
+
       setUserToDelete(null);
       await fetchUsers();
       await refreshSwitchableUsers();
     } catch (err: any) {
       setError(err?.message || 'Failed to delete user');
     } finally {
-      setLoading(false);
+      setDeletingUser(false);
     }
   };
+
+  const handleOpenTransfer = (user: UserType) => {
+    setUserToTransfer(user);
+    const otherUsers = users.filter((u) => u.id !== user.id);
+    const defaultRecipient = otherUsers.find((u) => u.role === 'admin') || otherUsers[0];
+    setStandaloneRecipientId(defaultRecipient?.id || '');
+  };
+
+  const handleExecuteTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userToTransfer || !standaloneRecipientId) return;
+
+    try {
+      setTransferringProjects(true);
+      setError(null);
+      const res = await api.transferUserProjects(userToTransfer.id, standaloneRecipientId);
+      const recipientUser = users.find((u) => u.id === standaloneRecipientId);
+      setSuccessMsg(`Successfully transferred ${res.transferredCount} project(s) from "${userToTransfer.name}" to "${recipientUser?.name || res.newOwnerName}".`);
+      setUserToTransfer(null);
+      await fetchUsers();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to transfer user projects');
+    } finally {
+      setTransferringProjects(false);
+    }
+  };
+
 
   const filteredUsers = users.filter(u => 
     u.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -442,6 +501,15 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
 
                             <td className="py-3.5 px-4 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1.5">
+                                {(u.project_count || 0) > 0 && (
+                                  <button
+                                    onClick={() => handleOpenTransfer(u)}
+                                    className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 dark:hover:text-indigo-400 transition-colors"
+                                    title={`Transfer all ${u.project_count} project(s) to another user`}
+                                  >
+                                    <ArrowLeftRight className="w-4 h-4" />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => handleOpenEdit(u)}
                                   className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 dark:hover:text-indigo-400 transition-colors"
@@ -450,7 +518,7 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
                                   <Edit3 className="w-4 h-4" />
                                 </button>
                                 <button
-                                  onClick={() => setUserToDelete(u)}
+                                  onClick={() => handleInitiateDelete(u)}
                                   disabled={isSelf}
                                   className={`p-1.5 rounded-lg transition-colors ${
                                     isSelf
@@ -473,34 +541,211 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
             </>
           )}
 
-          {/* Delete confirmation dialog */}
-          {userToDelete && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4">
-                <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
-                  <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/50 flex items-center justify-center">
-                    <Trash2 className="w-5 h-5" />
+          {/* Delete confirmation dialog with project transfer options */}
+          {userToDelete && (() => {
+            const otherUsers = users.filter((u) => u.id !== userToDelete.id);
+            const projectCount = userToDelete.project_count || 0;
+
+            return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+                <div 
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
+                    <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/50 flex items-center justify-center shrink-0">
+                      <Trash2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">Delete User Account</h3>
+                      <p className="text-xs text-slate-500">This action cannot be undone</p>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold">Delete User?</h3>
+
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Are you sure you want to delete user <strong>{userToDelete.name}</strong> ({userToDelete.email})?
+                  </p>
+
+                  {/* Project transfer section */}
+                  {projectCount > 0 ? (
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-2.5">
+                      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold text-xs">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <span>This user owns {projectCount} project{projectCount === 1 ? '' : 's'}.</span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                        Select how to handle projects owned by this user:
+                      </p>
+
+                      {otherUsers.length > 0 ? (
+                        <div className="space-y-2 pt-1">
+                          <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 dark:text-slate-300">
+                            <input
+                              type="radio"
+                              name="transferChoice"
+                              checked={transferOnDelete}
+                              onChange={() => setTransferOnDelete(true)}
+                              className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <div className="flex-1">
+                              <span className="font-semibold text-slate-900 dark:text-white">
+                                Transfer all {projectCount} project(s) to another user
+                              </span>
+                              {transferOnDelete && (
+                                <div className="mt-1.5">
+                                  <select
+                                    value={deleteRecipientId}
+                                    onChange={(e) => setDeleteRecipientId(e.target.value)}
+                                    className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                  >
+                                    {otherUsers.map((u) => (
+                                      <option key={u.id} value={u.id}>
+                                        {u.name} ({u.email}) - {u.role === 'admin' ? 'Admin' : 'Member'}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+                          </label>
+
+                          <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 dark:text-slate-300">
+                            <input
+                              type="radio"
+                              name="transferChoice"
+                              checked={!transferOnDelete}
+                              onChange={() => setTransferOnDelete(false)}
+                              className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <div>
+                              <span className="font-semibold text-slate-900 dark:text-white">Don't transfer</span>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                Projects will remain in the database under System / Unassigned ownership.
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          No other users available. Projects will become unassigned.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-400">
+                      This user does not own any projects. Their account can be deleted safely.
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setUserToDelete(null)}
+                      disabled={deletingUser}
+                      className="px-4 py-2 text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmDelete}
+                      disabled={deletingUser || (transferOnDelete && projectCount > 0 && !deleteRecipientId)}
+                      className="px-4 py-2 text-sm font-medium rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors flex items-center gap-2"
+                    >
+                      {deletingUser ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Deleting...</span>
+                        </>
+                      ) : transferOnDelete && projectCount > 0 ? (
+                        <>
+                          <ArrowLeftRight className="w-4 h-4" />
+                          <span>Transfer & Delete</span>
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4" />
+                          <span>Yes, Delete User</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
+              </div>
+            );
+          })()}
+
+          {/* Standalone Transfer Projects Dialog */}
+          {userToTransfer && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+              <div 
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 flex items-center justify-center shrink-0">
+                    <ArrowLeftRight className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Transfer All Projects</h3>
+                    <p className="text-xs text-slate-500">Reassign ownership to another user</p>
+                  </div>
+                </div>
+
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Are you sure you want to delete user <strong>{userToDelete.name}</strong> ({userToDelete.email})?
-                  Their assigned projects will be unassigned or transferred to the admin. This action cannot be undone.
+                  Transfer all <strong>{userToTransfer.project_count || 0} project(s)</strong> owned by{' '}
+                  <strong>{userToTransfer.name}</strong> ({userToTransfer.email}) to another user:
                 </p>
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    onClick={() => setUserToDelete(null)}
-                    className="px-4 py-2 text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleDeleteUser(userToDelete)}
-                    className="px-4 py-2 text-sm font-medium rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-sm"
-                  >
-                    Yes, Delete User
-                  </button>
-                </div>
+
+                <form onSubmit={handleExecuteTransfer} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                      Select Recipient User
+                    </label>
+                    <select
+                      value={standaloneRecipientId}
+                      onChange={(e) => setStandaloneRecipientId(e.target.value)}
+                      required
+                      className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {users
+                        .filter((u) => u.id !== userToTransfer.id)
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name} ({u.email}) - {u.role === 'admin' ? 'Admin' : 'Member'}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setUserToTransfer(null)}
+                      disabled={transferringProjects}
+                      className="px-4 py-2 text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={transferringProjects || !standaloneRecipientId}
+                      className="px-4 py-2 text-sm font-medium rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-colors flex items-center gap-2"
+                    >
+                      {transferringProjects ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Transferring...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ArrowLeftRight className="w-4 h-4" />
+                          <span>Transfer Projects</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}

@@ -443,24 +443,13 @@ export function UserManagementModal({ isOpen, onClose }: UserManagementModalProp
                     className="w-full pl-9 pr-3.5 py-1.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenTransfer()}
-                    className="px-3.5 py-2 text-sm font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-95"
-                    title="Transfer projects between any users"
-                  >
-                    <ArrowLeftRight className="w-4 h-4 text-indigo-500" />
-                    <span>Transfer Projects</span>
-                  </button>
-                  <button
-                    onClick={handleOpenAdd}
-                    className="px-4 py-2 text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    <span>Add New User</span>
-                  </button>
-                </div>
+                <button
+                  onClick={handleOpenAdd}
+                  className="px-4 py-2 text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shrink-0"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Add New User</span>
+                </button>
               </div>
 
               {/* Users Table */}

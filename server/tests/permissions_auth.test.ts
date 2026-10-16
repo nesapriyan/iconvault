@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { getDatabase } from '../src/db/connection.js';
@@ -119,6 +119,7 @@ describe('Project Visibility & Permission Enforcement', () => {
   let publicProjectId = '';
   let starIconId = '';
   let privateIconId = '';
+  let aliceUserId = '';
 
   beforeAll(async () => {
     // Admin login
@@ -143,6 +144,7 @@ describe('Project Visibility & Permission Enforcement', () => {
         password: 'securepassword123'
       });
     member2Token = m2Res.body.data.token;
+    aliceUserId = m2Res.body.data.user.id;
 
     // Member 1 creates a PRIVATE project with an icon
     const proj1 = await request(app)
@@ -400,6 +402,18 @@ describe('Project Visibility & Permission Enforcement', () => {
 
     // Clean up project
     await request(app).delete(`/api/projects/${projId}`).set('Authorization', `Bearer ${adminToken}`);
+  });
+
+  afterAll(async () => {
+    if (privateProjectId) {
+      await request(app).delete(`/api/projects/${privateProjectId}`).set('Authorization', `Bearer ${adminToken}`);
+    }
+    if (publicProjectId) {
+      await request(app).delete(`/api/projects/${publicProjectId}`).set('Authorization', `Bearer ${adminToken}`);
+    }
+    if (aliceUserId) {
+      await request(app).delete(`/api/users/${aliceUserId}`).set('Authorization', `Bearer ${adminToken}`);
+    }
   });
 });
 

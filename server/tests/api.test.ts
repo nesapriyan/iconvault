@@ -1,10 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../src/index.js';
+import { UserRepo } from '../src/db/repositories/userRepo.js';
 
 describe('IconVault REST API', () => {
   let createdProjectId = '';
   let createdFolderId = '';
+  let recipientId = '';
 
   it('GET /api/health should return ok', async () => {
     const res = await request(app).get('/api/health');
@@ -171,7 +173,7 @@ describe('IconVault REST API', () => {
     const regRes = await request(app)
       .post('/api/auth/register')
       .send({ name: 'Transfer Recipient', email: uniqueEmail, password: 'password123' });
-    const recipientId = regRes.body.data.user.id;
+    recipientId = regRes.body.data.user.id;
 
     // Transfer project
     const transferRes = await request(app)
@@ -186,5 +188,11 @@ describe('IconVault REST API', () => {
   it('DELETE /api/projects/:id should delete project and storage', async () => {
     const res = await request(app).delete(`/api/projects/${createdProjectId}`);
     expect(res.status).toBe(200);
+  });
+
+  afterAll(() => {
+    if (recipientId) {
+      UserRepo.delete(recipientId);
+    }
   });
 });

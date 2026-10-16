@@ -372,60 +372,64 @@ export function ProjectManagementModal({
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Multi-select User / Owner Filter Popover */}
             <div className="relative" ref={userFilterRef}>
-              <button
-                type="button"
-                onClick={() => setIsUserFilterOpen(prev => !prev)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer select-none shadow-2xs ${
+              <div
+                className={`inline-flex items-center rounded-xl border text-xs font-semibold transition-all shadow-2xs ${
                   selectedOwnerIds.length > 0
-                    ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/15'
+                    ? 'bg-primary/10 border-primary/30 text-primary'
                     : 'bg-secondary/60 border-border/80 text-foreground hover:bg-secondary'
                 }`}
-                title="Filter projects by one or multiple users"
               >
-                <UserIcon className={`w-3.5 h-3.5 ${selectedOwnerIds.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
-                <span className="max-w-[130px] truncate">{getOwnerFilterLabel()}</span>
-                {selectedOwnerIds.length > 0 && (
-                  <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0">
-                    {selectedOwnerIds.length}
-                  </span>
-                )}
-                <ChevronDown className={`w-3 h-3 text-muted-foreground transition-transform duration-200 ${isUserFilterOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Clear shortcut if filtered */}
-              {selectedOwnerIds.length > 0 && (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    clearOwnerFilter();
-                  }}
-                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-secondary border border-border text-muted-foreground hover:text-foreground flex items-center justify-center shadow-xs cursor-pointer z-10"
-                  title="Clear user filter"
+                  onClick={() => setIsUserFilterOpen(prev => !prev)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer select-none"
+                  title="Filter projects by one or multiple users"
                 >
-                  <X className="w-2.5 h-2.5" />
+                  <UserIcon className={`w-3.5 h-3.5 ${selectedOwnerIds.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <span className="max-w-[130px] truncate">{getOwnerFilterLabel()}</span>
+                  {selectedOwnerIds.length > 0 && (
+                    <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0">
+                      {selectedOwnerIds.length}
+                    </span>
+                  )}
+                  <ChevronDown className={`w-3 h-3 text-muted-foreground transition-transform duration-200 ${isUserFilterOpen ? 'rotate-180' : ''}`} />
                 </button>
-              )}
 
-              {/* Multi-select dropdown popover */}
+                {/* Integrated Clear shortcut inside the pill */}
+                {selectedOwnerIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearOwnerFilter();
+                    }}
+                    className="p-1 mr-1 rounded-lg text-primary/70 hover:text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+                    title="Clear user filter"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Multi-select dropdown popover with fully opaque background */}
               {isUserFilterOpen && (
-                <div className="absolute right-0 sm:right-auto sm:left-0 top-full mt-2 w-72 bg-popover text-popover-foreground border border-border rounded-2xl shadow-xl z-50 p-2 space-y-2 animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute right-0 sm:right-auto sm:left-0 top-full mt-2 w-80 bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 p-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-150">
                   {/* Search user */}
                   <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       value={userFilterSearch}
                       onChange={e => setUserFilterSearch(e.target.value)}
-                      placeholder="Filter users..."
-                      className="w-full pl-8 pr-7 py-1 rounded-lg bg-secondary/50 border border-border text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="Filter users by name or email..."
+                      className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary"
                       autoFocus
                     />
                     {userFilterSearch && (
                       <button
                         type="button"
                         onClick={() => setUserFilterSearch('')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -433,7 +437,7 @@ export function ProjectManagementModal({
                   </div>
 
                   {/* Quick Select All / Clear All bar */}
-                  <div className="flex items-center justify-between px-1 text-[11px] text-muted-foreground border-b border-border/60 pb-1.5">
+                  <div className="flex items-center justify-between px-1 text-[11px] text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 pb-1.5">
                     <button
                       type="button"
                       onClick={selectAllOwners}
@@ -452,7 +456,7 @@ export function ProjectManagementModal({
                   </div>
 
                   {/* Scrollable list of users */}
-                  <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
+                  <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
                     {users
                       .filter(u => 
                         u.name.toLowerCase().includes(userFilterSearch.toLowerCase()) || 
@@ -467,33 +471,36 @@ export function ProjectManagementModal({
                           <div
                             key={u.id}
                             onClick={() => toggleOwnerSelection(u.id)}
-                            className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl text-xs cursor-pointer transition-colors ${
+                            className={`flex items-center justify-between gap-2.5 px-2.5 py-1.5 rounded-xl text-xs cursor-pointer transition-colors ${
                               isSelected
                                 ? 'bg-primary/10 text-primary font-medium'
-                                : 'hover:bg-secondary/60 text-foreground'
+                                : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-slate-100'
                             }`}
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="text-muted-foreground shrink-0">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div className="text-slate-400 shrink-0">
                                 {isSelected ? (
-                                  <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                                  <CheckSquare className="w-4 h-4 text-primary" />
                                 ) : (
-                                  <Square className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <Square className="w-4 h-4 text-slate-400" />
                                 )}
                               </div>
-                              <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-slate-600 to-slate-800 text-white flex items-center justify-center font-bold text-[9px] shrink-0">
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-slate-600 to-slate-800 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
                                 {initial}
                               </div>
-                              <div className="min-w-0 truncate">
-                                <span className="truncate">{u.name}</span>
-                                {u.role === 'admin' && (
-                                  <span className="ml-1 text-[9px] px-1 py-0.2 rounded bg-purple-500/15 text-purple-600 dark:text-purple-400 font-semibold">
-                                    Admin
-                                  </span>
-                                )}
+                              <div className="min-w-0 flex-1 truncate">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-xs truncate">{u.name}</span>
+                                  {u.role === 'admin' && (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 font-semibold border border-purple-500/20 shrink-0">
+                                      Admin
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">{u.email}</div>
                               </div>
                             </div>
-                            <span className="text-[10px] text-muted-foreground shrink-0">
+                            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 shrink-0 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800">
                               {count} proj
                             </span>
                           </div>
@@ -504,26 +511,29 @@ export function ProjectManagementModal({
                     {('unassigned'.includes(userFilterSearch.toLowerCase()) || 'system'.includes(userFilterSearch.toLowerCase())) && (
                       <div
                         onClick={() => toggleOwnerSelection('unassigned')}
-                        className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl text-xs cursor-pointer transition-colors ${
+                        className={`flex items-center justify-between gap-2.5 px-2.5 py-1.5 rounded-xl text-xs cursor-pointer transition-colors ${
                           selectedOwnerIds.includes('unassigned')
                             ? 'bg-primary/10 text-primary font-medium'
-                            : 'hover:bg-secondary/60 text-foreground'
+                            : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-slate-100'
                         }`}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="text-muted-foreground shrink-0">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="text-slate-400 shrink-0">
                             {selectedOwnerIds.includes('unassigned') ? (
-                              <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                              <CheckSquare className="w-4 h-4 text-primary" />
                             ) : (
-                              <Square className="w-3.5 h-3.5 text-muted-foreground" />
+                              <Square className="w-4 h-4 text-slate-400" />
                             )}
                           </div>
-                          <div className="w-5 h-5 rounded-full bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold text-[9px] shrink-0">
+                          <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold text-[10px] shrink-0">
                             ⚙️
                           </div>
-                          <span className="truncate">Unassigned / System</span>
+                          <div className="min-w-0 flex-1 truncate">
+                            <span className="font-semibold text-xs truncate">Unassigned / System</span>
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">No assigned project owner</div>
+                          </div>
                         </div>
-                        <span className="text-[10px] text-muted-foreground shrink-0">
+                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 shrink-0 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800">
                           {projects.filter(p => !p.owner_id).length} proj
                         </span>
                       </div>
@@ -532,6 +542,7 @@ export function ProjectManagementModal({
                 </div>
               )}
             </div>
+
 
             {/* Visibility */}
             <div className="flex items-center bg-secondary/60 p-0.5 rounded-xl border border-border/80 text-xs">

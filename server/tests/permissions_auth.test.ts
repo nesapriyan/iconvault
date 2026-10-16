@@ -404,6 +404,52 @@ describe('Project Visibility & Permission Enforcement', () => {
     await request(app).delete(`/api/projects/${projId}`).set('Authorization', `Bearer ${adminToken}`);
   });
 
+  it('Bulk Project Transfer: Admin can transfer multiple selected projects to another user', async () => {
+    // 1. Create two test projects
+    const p1Res = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Bulk Test Proj 1', prefix: 'bt1' });
+    const p2Res = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Bulk Test Proj 2', prefix: 'bt2' });
+    const p1Id = p1Res.body.data.id;
+    const p2Id = p2Res.body.data.id;
+
+    // 2. Non-admin gets 403
+    const nonAdminRes = await request(app)
+      .post('/api/projects/bulk-transfer')
+      .set('Authorization', `Bearer ${member1Token}`)
+      .send({
+        projectIds: [p1Id, p2Id],
+        newOwnerId: 'usr-member-0000-0000-000000000002'
+      });
+    expect(nonAdminRes.status).toBe(403);
+
+    // 3. Admin transfers both projects to member
+    const transferRes = await request(app)
+      .post('/api/projects/bulk-transfer')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        projectIds: [p1Id, p2Id],
+        newOwnerId: 'usr-member-0000-0000-000000000002'
+      });
+    expect(transferRes.status).toBe(200);
+    expect(transferRes.body.data.transferredCount).toBe(2);
+    expect(transferRes.body.data.newOwnerId).toBe('usr-member-0000-0000-000000000002');
+
+    // 4. Verify owner updated
+    const check1 = await request(app).get(`/api/projects/${p1Id}`).set('Authorization', `Bearer ${adminToken}`);
+    const check2 = await request(app).get(`/api/projects/${p2Id}`).set('Authorization', `Bearer ${adminToken}`);
+    expect(check1.body.data.owner_id).toBe('usr-member-0000-0000-000000000002');
+    expect(check2.body.data.owner_id).toBe('usr-member-0000-0000-000000000002');
+
+    // Clean up projects
+    await request(app).delete(`/api/projects/${p1Id}`).set('Authorization', `Bearer ${adminToken}`);
+    await request(app).delete(`/api/projects/${p2Id}`).set('Authorization', `Bearer ${adminToken}`);
+  });
+
   afterAll(async () => {
     if (privateProjectId) {
       await request(app).delete(`/api/projects/${privateProjectId}`).set('Authorization', `Bearer ${adminToken}`);

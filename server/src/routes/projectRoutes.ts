@@ -214,6 +214,43 @@ router.post('/bulk-delete', (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
+// Bulk transfer projects ownership (admin only)
+router.post('/bulk-transfer', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      throw new ForbiddenError('Only administrators can perform bulk transfer of projects');
+    }
+
+    const { projectIds, newOwnerId } = req.body;
+    if (!Array.isArray(projectIds) || projectIds.length === 0) {
+      throw new BadRequestError('projectIds array is required');
+    }
+    if (!newOwnerId || typeof newOwnerId !== 'string') {
+      throw new BadRequestError('newOwnerId is required');
+    }
+
+    const targetUser = UserRepo.findById(newOwnerId);
+    if (!targetUser) {
+      throw new NotFoundError('Target user not found');
+    }
+
+    const transferredCount = ProjectRepo.bulkTransfer(projectIds, targetUser.id);
+
+    res.json({
+      success: true,
+      data: {
+        transferredCount,
+        newOwnerId: targetUser.id,
+        newOwnerName: targetUser.name,
+        newOwnerEmail: targetUser.email
+      },
+      message: `Successfully transferred ${transferredCount} project(s) to ${targetUser.name}`
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Transfer project ownership to another user (owner or admin only)
 router.post('/:id/transfer', (req: Request, res: Response, next: NextFunction) => {
   try {

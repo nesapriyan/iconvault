@@ -162,6 +162,27 @@ export const api = {
     });
   },
 
+  async bulkTransferProjects(projectIds: string[], newOwnerId: string): Promise<{
+    transferredCount: number;
+    newOwnerId: string;
+    newOwnerName: string;
+    newOwnerEmail: string;
+  }> {
+    const res = await fetchJson<{
+      data: {
+        transferredCount: number;
+        newOwnerId: string;
+        newOwnerName: string;
+        newOwnerEmail: string;
+      };
+      message: string;
+    }>(`${API_BASE}/projects/bulk-transfer`, {
+      method: 'POST',
+      body: JSON.stringify({ projectIds, newOwnerId })
+    });
+    return (res as any).data || res;
+  },
+
   // Folders
   async getFolders(projectId: string): Promise<Folder[]> {
     return fetchJson<Folder[]>(`${API_BASE}/projects/${projectId}/folders`);

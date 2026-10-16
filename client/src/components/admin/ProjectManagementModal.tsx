@@ -116,6 +116,11 @@ export function ProjectManagementModal({
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Bulk Transfer State
+  const [showBulkTransferModal, setShowBulkTransferModal] = useState(false);
+  const [bulkTransferNewOwnerId, setBulkTransferNewOwnerId] = useState<string>('');
+  const [bulkTransferring, setBulkTransferring] = useState(false);
+
   // Load all projects and users for admin
   const loadData = useCallback(async () => {
     try {
@@ -147,6 +152,8 @@ export function ProjectManagementModal({
       setTransferTarget(null);
       setDeleteTarget(null);
       setShowBulkDeleteConfirm(false);
+      setShowBulkTransferModal(false);
+      setBulkTransferNewOwnerId('');
     }
   }, [isOpen, loadData]);
 
@@ -254,6 +261,29 @@ export function ProjectManagementModal({
       error(err.message || 'Failed to delete project');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // Bulk Transfer Projects Handler
+  const handleBulkTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedIds.size === 0 || !bulkTransferNewOwnerId) return;
+
+    try {
+      setBulkTransferring(true);
+      const ids = Array.from(selectedIds);
+      const recipient = users.find(u => u.id === bulkTransferNewOwnerId);
+      const res = await api.bulkTransferProjects(ids, bulkTransferNewOwnerId);
+      success(`Successfully transferred ${res.transferredCount} project(s) to ${recipient?.name || res.newOwnerName}!`);
+      setShowBulkTransferModal(false);
+      setBulkTransferNewOwnerId('');
+      setSelectedIds(new Set());
+      await loadData();
+      onRefresh();
+    } catch (err: any) {
+      error(err.message || 'Failed to transfer selected projects');
+    } finally {
+      setBulkTransferring(false);
     }
   };
 
@@ -607,14 +637,30 @@ export function ProjectManagementModal({
           </div>
 
           {selectedIds.size > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowBulkDeleteConfirm(true)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-destructive/10 hover:bg-destructive text-destructive hover:text-white border border-destructive/20 text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete Selected ({selectedIds.size})</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkTransferNewOwnerId('');
+                  setShowBulkTransferModal(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-white border border-primary/20 text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95"
+                title="Transfer all selected projects to another user"
+              >
+                <ArrowLeftRight className="w-3.5 h-3.5" />
+                <span>Transfer Selected ({selectedIds.size})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-destructive/10 hover:bg-destructive text-destructive hover:text-white border border-destructive/20 text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95"
+                title="Permanently delete all selected projects"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Selected ({selectedIds.size})</span>
+              </button>
+            </div>
           )}
         </div>
 
@@ -981,6 +1027,93 @@ export function ProjectManagementModal({
                   <span>Delete Project</span>
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sub-Dialog: Bulk Transfer Projects Ownership */}
+        {showBulkTransferModal && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-background/85 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-6 flex flex-col gap-4 animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-1 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <ArrowLeftRight className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Bulk Transfer Projects</h3>
+                    <p className="text-[11px] text-muted-foreground">Reassign {selectedIds.size} project(s) to a new owner</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBulkTransferModal(false)}
+                  className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Selected Projects Summary */}
+              <div className="p-3 rounded-xl bg-secondary/50 border border-border text-xs">
+                <div className="flex items-center justify-between font-semibold text-foreground mb-1.5">
+                  <span>Selected Projects ({selectedIds.size})</span>
+                  <span className="text-[10px] text-muted-foreground font-normal">will be transferred</span>
+                </div>
+                <div className="max-h-28 overflow-y-auto flex flex-wrap gap-1.5 pr-1">
+                  {projects
+                    .filter(p => selectedIds.has(p.id))
+                    .map(p => (
+                      <span
+                        key={p.id}
+                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-card border border-border text-[11px] text-foreground font-medium max-w-[200px] truncate"
+                        title={p.name}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                        <span className="truncate">{p.name}</span>
+                      </span>
+                    ))}
+                </div>
+              </div>
+
+              {/* New Owner Select Form */}
+              <form onSubmit={handleBulkTransfer} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-foreground">Select New Owner *</label>
+                  <select
+                    value={bulkTransferNewOwnerId}
+                    onChange={e => setBulkTransferNewOwnerId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl bg-card border border-border text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                  >
+                    <option value="" disabled>Choose a user to receive all selected projects...</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.email}) - {u.role === 'admin' ? 'Admin' : 'Member'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setShowBulkTransferModal(false)}
+                    disabled={bulkTransferring}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={bulkTransferring || !bulkTransferNewOwnerId}
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 disabled:opacity-50 cursor-pointer shadow-xs active:scale-95"
+                  >
+                    {bulkTransferring && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <span>Confirm Bulk Transfer ({selectedIds.size})</span>
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

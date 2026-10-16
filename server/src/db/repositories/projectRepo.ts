@@ -266,5 +266,18 @@ export const ProjectRepo = {
     const db = getDatabase();
     const res = db.prepare('DELETE FROM projects WHERE id = ?').run(id);
     return res.changes > 0;
+  },
+
+  bulkTransfer(projectIds: string[], newOwnerId: string): number {
+    if (projectIds.length === 0) return 0;
+    const db = getDatabase();
+    const now = new Date().toISOString();
+    const placeholders = projectIds.map(() => '?').join(',');
+    const res = db.prepare(`
+      UPDATE projects 
+      SET owner_id = ?, updated_at = ? 
+      WHERE id IN (${placeholders})
+    `).run(newOwnerId, now, ...projectIds);
+    return res.changes;
   }
 };

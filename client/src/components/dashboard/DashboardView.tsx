@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Plus, Search, FolderKanban, Sparkles, Type, Globe, Lock } from 'lucide-react';
-import { Project } from '../../types';
+import { Plus, Search, FolderKanban, Sparkles, Type, Globe, Lock, X, Copy, Loader2, ArrowRight } from 'lucide-react';
+import { Project, GlobalSearchIconItem } from '../../types';
 import { ProjectCard } from './ProjectCard';
+import { GlobalIconSearchCard } from './GlobalIconSearchCard';
+import { CopyIconModal } from '../icons/CopyIconModal';
 import { CreateProjectModal } from './CreateProjectModal';
 import { ImportProjectModal } from './ImportProjectModal';
 import { ConfirmDialog } from '../common/ConfirmDialog';
@@ -24,6 +26,12 @@ export function DashboardView({
 }: DashboardViewProps) {
   const { currentUser } = useAuth();
   const [search, setSearch] = useState('');
+
+  // Icon search state & tabs
+  const [iconResults, setIconResults] = useState<GlobalSearchIconItem[]>([]);
+  const [loadingIcons, setLoadingIcons] = useState(false);
+  const [searchTab, setSearchTab] = useState<'all' | 'projects' | 'icons'>('all');
+  const [copyModalIcon, setCopyModalIcon] = useState<GlobalSearchIconItem | null>(null);
   
   // Default to 'private' and 'all' when user is logged in
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>(() => {
@@ -44,6 +52,52 @@ export function DashboardView({
       setPurposeFilter('all');
     }
   }, [currentUser?.id]);
+
+  // Debounced Global Icon Search
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (!trimmed) {
+      setIconResults([]);
+      setLoadingIcons(false);
+      setSearchTab('all');
+      return;
+    }
+
+    setLoadingIcons(true);
+    const timeout = setTimeout(() => {
+      api.searchIcons(trimmed, 60)
+        .then(res => {
+          setIconResults(res.icons || []);
+        })
+        .catch(err => {
+          console.warn('Global icon search failed:', err);
+          setIconResults([]);
+        })
+        .finally(() => {
+          setLoadingIcons(false);
+        });
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [search]);
+
+  // Download individual icon SVG directly as blob
+  const handleDownloadIcon = (icon: GlobalSearchIconItem) => {
+    try {
+      const svgBlob = new Blob([icon.rawSvg || ''], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${icon.slug || icon.name}.svg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      success(`Downloaded ${icon.name}.svg`);
+    } catch (err: any) {
+      error(err.message || 'Failed to download icon');
+    }
+  };
 
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
@@ -154,9 +208,19 @@ export function DashboardView({
             id="global-search-input"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search projects by name, prefix, or description... (⌘K)"
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-card border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-xs"
+            placeholder="Search projects and icons across all vaults... (⌘K)"
+            className="w-full pl-10 pr-9 py-2 rounded-xl bg-card border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-xs"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded-md hover:bg-secondary transition-colors cursor-pointer"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Right side: Visibility and Purpose Filters */}
@@ -293,69 +357,235 @@ export function DashboardView({
         </div>
       </div>
 
-      {/* Projects Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-            <div key={n} className="h-44 rounded-2xl bg-card border border-border animate-pulse p-5" />
-          ))}
-        </div>
-      ) : filteredProjects.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 pb-8">
-          {filteredProjects.map(project => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              onOpen={onOpenProject}
-              onEdit={p => {
-                setEditingProject(p);
-                setCreateModalOpen(true);
-              }}
-              onDuplicate={handleDuplicate}
-              onDelete={(id, name) => setDeleteTarget({ id, name })}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-16 bg-card border border-dashed border-border rounded-3xl p-8">
-          <div className="w-12 h-12 rounded-2xl bg-secondary mx-auto flex items-center justify-center text-muted-foreground mb-4">
-            <FolderKanban className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-foreground">No projects found</h3>
-          <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-            {search
-              ? `No projects matching "${search}". Try searching for something else.`
-              : visibilityFilter === 'private'
-              ? 'No private projects found in your workspace.'
-              : visibilityFilter === 'public'
-              ? 'No public projects found.'
-              : 'Create your first project to start organizing SVG icons, sprites, and icon fonts.'}
-          </p>
-          {visibilityFilter === 'private' && visibilityCounts.public > 0 && !search && (
-            <div className="mt-3">
+      {/* When Search is Active: 2-Part View (Projects + Icons) */}
+      {search.trim().length > 0 ? (
+        <div className="flex flex-col gap-6 pb-10">
+          {/* Search Result Summary Header & Tabs */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-border/80 shrink-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-semibold text-foreground">
+                Search results for &ldquo;{search.trim()}&rdquo;
+              </span>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-secondary border border-border/70 text-muted-foreground font-medium">
+                {filteredProjects.length + iconResults.length} total
+              </span>
+            </div>
+
+            {/* 2-Part Switcher Tabs: All / Projects / Icons */}
+            <div className="flex items-center gap-1 bg-secondary/80 p-1 rounded-xl border border-border/80 shadow-xs">
               <button
                 type="button"
-                onClick={() => setVisibilityFilter('public')}
-                className="text-xs font-semibold text-blue-500 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                onClick={() => setSearchTab('all')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  searchTab === 'all'
+                    ? 'bg-foreground text-background shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
               >
-                <Globe className="w-3.5 h-3.5" />
-                <span>View {visibilityCounts.public} public project{visibilityCounts.public === 1 ? '' : 's'}</span>
+                <span>All Results</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  searchTab === 'all' ? 'bg-background/20 text-background' : 'bg-card text-muted-foreground'
+                }`}>
+                  {filteredProjects.length + iconResults.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSearchTab('projects')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  searchTab === 'projects'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <FolderKanban className="w-3.5 h-3.5" />
+                <span>Projects</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  searchTab === 'projects' ? 'bg-white/20 text-white' : 'bg-card text-muted-foreground'
+                }`}>
+                  {filteredProjects.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSearchTab('icons')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  searchTab === 'icons'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Icons</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  searchTab === 'icons' ? 'bg-white/20 text-white' : 'bg-card text-muted-foreground'
+                }`}>
+                  {loadingIcons ? '...' : iconResults.length}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Part 1: Projects Section */}
+          {(searchTab === 'all' || searchTab === 'projects') && (
+            <div>
+              <div className="flex items-center justify-between mb-3.5">
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <FolderKanban className="w-4 h-4 text-blue-500" />
+                  <span>Matching Projects</span>
+                  <span className="text-xs font-normal text-muted-foreground">({filteredProjects.length})</span>
+                </h3>
+              </div>
+
+              {filteredProjects.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+                  {filteredProjects.map(project => (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      onOpen={onOpenProject}
+                      onEdit={p => {
+                        setEditingProject(p);
+                        setCreateModalOpen(true);
+                      }}
+                      onDuplicate={handleDuplicate}
+                      onDelete={(id, name) => setDeleteTarget({ id, name })}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 rounded-2xl bg-secondary/30 border border-dashed border-border/80 text-center text-xs text-muted-foreground">
+                  No projects matching &ldquo;{search}&rdquo;
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Part 2: Icons Section */}
+          {(searchTab === 'all' || searchTab === 'icons') && (
+            <div className={searchTab === 'all' ? 'mt-2' : ''}>
+              <div className="flex items-center justify-between mb-3.5">
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-500" />
+                  <span>Matching Icons</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {loadingIcons ? '(searching...)' : `(${iconResults.length})`}
+                  </span>
+                </h3>
+              </div>
+
+              {loadingIcons ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
+                    <div key={n} className="h-48 rounded-2xl bg-card border border-border animate-pulse p-4" />
+                  ))}
+                </div>
+              ) : iconResults.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {iconResults.map(icon => (
+                    <GlobalIconSearchCard
+                      key={`${icon.project_id}:${icon.id}`}
+                      icon={icon}
+                      onOpenProject={onOpenProject}
+                      onCopyIcon={iconItem => setCopyModalIcon(iconItem)}
+                      onDownloadIcon={handleDownloadIcon}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 rounded-2xl bg-secondary/30 border border-dashed border-border/80 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+                  <Sparkles className="w-6 h-6 text-muted-foreground/60" />
+                  <p>No icons found matching &ldquo;{search}&rdquo; across any accessible project.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Completely empty state if neither has results */}
+          {filteredProjects.length === 0 && iconResults.length === 0 && !loadingIcons && (
+            <div className="text-center py-12 bg-card border border-dashed border-border rounded-3xl p-8 max-w-md mx-auto">
+              <div className="w-12 h-12 rounded-2xl bg-secondary mx-auto flex items-center justify-center text-muted-foreground mb-3">
+                <Search className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-foreground">No matches found</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                We couldn&apos;t find any projects or icons matching &ldquo;{search}&rdquo;.
+              </p>
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="mt-4 px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-xs font-semibold text-foreground border border-border transition-colors cursor-pointer"
+              >
+                Clear Search
               </button>
             </div>
           )}
-          {!search && (
-            <button
-              onClick={() => {
-                setEditingProject(null);
-                setCreateModalOpen(true);
-              }}
-              className="mt-4 px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-blue-600 transition-colors inline-flex items-center gap-1.5 shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Create Project</span>
-            </button>
-          )}
         </div>
+      ) : (
+        /* Regular Dashboard View when search is empty */
+        <>
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                <div key={n} className="h-44 rounded-2xl bg-card border border-border animate-pulse p-5" />
+              ))}
+            </div>
+          ) : filteredProjects.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 pb-8">
+              {filteredProjects.map(project => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onOpen={onOpenProject}
+                  onEdit={p => {
+                    setEditingProject(p);
+                    setCreateModalOpen(true);
+                  }}
+                  onDuplicate={handleDuplicate}
+                  onDelete={(id, name) => setDeleteTarget({ id, name })}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 bg-card border border-dashed border-border rounded-3xl p-8">
+              <div className="w-12 h-12 rounded-2xl bg-secondary mx-auto flex items-center justify-center text-muted-foreground mb-4">
+                <FolderKanban className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-foreground">No projects found</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                {visibilityFilter === 'private'
+                  ? 'No private projects found in your workspace.'
+                  : visibilityFilter === 'public'
+                  ? 'No public projects found.'
+                  : 'Create your first project to start organizing SVG icons, sprites, and icon fonts.'}
+              </p>
+              {visibilityFilter === 'private' && visibilityCounts.public > 0 && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setVisibilityFilter('public')}
+                    className="text-xs font-semibold text-blue-500 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>View {visibilityCounts.public} public project{visibilityCounts.public === 1 ? '' : 's'}</span>
+                  </button>
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  setEditingProject(null);
+                  setCreateModalOpen(true);
+                }}
+                className="mt-4 px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-blue-600 transition-colors inline-flex items-center gap-1.5 shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create Project</span>
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Modals & Dialogs */}
@@ -383,6 +613,17 @@ export function DashboardView({
         danger
         onCancel={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
+      />
+
+      {/* Copy Icon to Project Modal */}
+      <CopyIconModal
+        isOpen={!!copyModalIcon}
+        icon={copyModalIcon}
+        projects={projects}
+        onClose={() => setCopyModalIcon(null)}
+        onSuccess={() => {
+          onRefresh();
+        }}
       />
     </div>
   );

@@ -59,5 +59,14 @@ export const Permissions = {
     if (user?.role === 'admin') return true;
     if (user && project.owner_id === user.id) return true;
     return false;
+  },
+
+  isAdmin(user: UserOrSafe): boolean {
+    return user?.role === 'admin';
+  },
+
+  isOwner(user: UserOrSafe, project: ProjectRecord): boolean {
+    if (!user || !project) return false;
+    return project.owner_id === user.id;
   }
 };

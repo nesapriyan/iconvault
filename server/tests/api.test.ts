@@ -154,6 +154,17 @@ describe('IconVault REST API', () => {
     expect(multiRes.headers['content-disposition']).toContain('-icons.zip');
   });
 
+  it('GET /api/icons/search should search icons across projects', async () => {
+    const searchRes = await request(app).get('/api/icons/search?q=Tri');
+    expect(searchRes.status).toBe(200);
+    expect(searchRes.body.success).toBe(true);
+    expect(Array.isArray(searchRes.body.data.icons)).toBe(true);
+    expect(searchRes.body.data.icons.length).toBeGreaterThanOrEqual(1);
+    expect(searchRes.body.data.icons[0].name).toBe('Triangle');
+    expect(searchRes.body.data.icons[0].project_name).toBe('API Test Project');
+    expect(searchRes.body.data.icons[0].rawSvg).toContain('<svg');
+  });
+
   it('DELETE /api/projects/:id should delete project and storage', async () => {
     const res = await request(app).delete(`/api/projects/${createdProjectId}`);
     expect(res.status).toBe(200);

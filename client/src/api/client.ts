@@ -1,4 +1,4 @@
-import { Project, Folder, IconItem, BuildItem, SpriteBuildResponse, FontBuildResponse, User } from '../types';
+import { Project, Folder, IconItem, GlobalSearchIconItem, BuildItem, SpriteBuildResponse, FontBuildResponse, User } from '../types';
 
 const API_BASE = ((import.meta as any).env?.VITE_API_URL as string) || '/api';
 
@@ -210,6 +210,36 @@ export const api = {
   async getIcon(id: string): Promise<IconItem> {
     const icon = await fetchJson<IconItem>(`${API_BASE}/icons/${id}`);
     return normalizeIcon(icon);
+  },
+
+  async searchIcons(query: string, limit = 60, page = 1): Promise<{
+    icons: GlobalSearchIconItem[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    const q = new URLSearchParams({
+      q: query,
+      limit: limit.toString(),
+      page: page.toString()
+    });
+    const res = await fetchJson<{
+      icons: any[];
+      total: number;
+      page: number;
+      totalPages: number;
+    }>(`${API_BASE}/icons/search?${q.toString()}`);
+    return {
+      ...res,
+      icons: (res.icons || []).map(icon => ({
+        ...normalizeIcon(icon),
+        project_name: icon.project_name,
+        project_prefix: icon.project_prefix,
+        project_color: icon.project_color,
+        project_visibility: icon.project_visibility,
+        project_purpose: icon.project_purpose
+      }))
+    };
   },
 
   async uploadIcons(projectId: string, formData: FormData): Promise<{

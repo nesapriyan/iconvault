@@ -214,6 +214,53 @@ router.get('/projects/:projectId/icons', (req: Request, res: Response, next: Nex
   }
 });
 
+// Global icon search across all accessible projects
+router.get('/icons/search', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = ((req.query.q || req.query.search || '') as string).trim();
+    const limit = Math.min(parseInt(req.query.limit as string || '60', 10), 100);
+    const page = Math.max(parseInt(req.query.page as string || '1', 10), 1);
+
+    if (!q) {
+      return res.json({
+        success: true,
+        data: {
+          icons: [],
+          total: 0,
+          page: 1,
+          totalPages: 0
+        }
+      });
+    }
+
+    const { icons, total } = IconRepo.searchGlobal({
+      user: req.user,
+      query: q,
+      limit,
+      page
+    });
+
+    res.json({
+      success: true,
+      data: {
+        icons: icons.map(icon => ({
+          ...formatIconResponse(icon),
+          project_name: icon.project_name,
+          project_prefix: icon.project_prefix,
+          project_color: icon.project_color,
+          project_visibility: icon.project_visibility,
+          project_purpose: icon.project_purpose
+        })),
+        total,
+        page,
+        totalPages: limit > 0 ? Math.ceil(total / limit) : 1
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Get single icon details including raw SVG and versions
 router.get('/icons/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -999,8 +1046,8 @@ router.post('/projects/:projectId/icons/copy-from-project', (req: Request, res: 
     const sourceProject = ProjectRepo.findById(sourceProjectId);
     if (!sourceProject) throw new NotFoundError('Source project not found');
 
-    if (sourceProject.visibility !== 'public') {
-      throw new ForbiddenError('Icons cannot be imported from private projects. Only public projects can be used as an import source.');
+    if (sourceProject.visibility !== 'public' && !Permissions.isOwner(req.user, sourceProject) && !Permissions.isAdmin(req.user)) {
+      throw new ForbiddenError('Icons cannot be imported from private projects. Only public projects or your own projects can be used as an import source.');
     }
 
     const strategy = (duplicateStrategy || 'rename') as 'rename' | 'replace' | 'skip';

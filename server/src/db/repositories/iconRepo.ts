@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getDatabase } from '../connection.js';
+import { UserRecord, UserSafe } from './userRepo.js';
 
 export interface IconRecord {
   id: string;
@@ -103,6 +104,75 @@ export const IconRepo = {
     }
 
     const icons = db.prepare(`SELECT * FROM icons ${whereClause} ${orderClause} ${limitClause}`).all(...params) as IconRecord[];
+    return { icons, total };
+  },
+
+  searchGlobal(options: {
+    user?: UserRecord | UserSafe | null;
+    query: string;
+    limit?: number;
+    page?: number;
+  }): {
+    icons: (IconRecord & {
+      project_name: string;
+      project_prefix: string;
+      project_color: string;
+      project_visibility: 'public' | 'private';
+      project_purpose: 'sprite' | 'font';
+    })[];
+    total: number;
+  } {
+    const db = getDatabase();
+    const term = `%${options.query.trim()}%`;
+    const params: any[] = [];
+
+    let whereClause = 'WHERE i.deleted_at IS NULL AND p.is_archived = 0';
+
+    // Access control filtering:
+    // Admin: can see all
+    // Logged in: can see own projects + public projects
+    // Guest: only public projects
+    if (options.user?.role !== 'admin') {
+      if (options.user) {
+        whereClause += ' AND (p.owner_id = ? OR p.visibility = \'public\')';
+        params.push(options.user.id);
+      } else {
+        whereClause += ' AND p.visibility = \'public\'';
+      }
+    }
+
+    whereClause += ' AND (i.name LIKE ? OR i.slug LIKE ? OR i.tags LIKE ?)';
+    params.push(term, term, term);
+
+    const countSql = `
+      SELECT COUNT(*) as count
+      FROM icons i
+      JOIN projects p ON p.id = i.project_id
+      ${whereClause}
+    `;
+    const countRow = db.prepare(countSql).get(...params) as { count: number };
+    const total = countRow ? countRow.count : 0;
+
+    const limit = options.limit && options.limit > 0 ? options.limit : 60;
+    const page = options.page && options.page > 0 ? options.page : 1;
+    const offset = (page - 1) * limit;
+
+    const selectSql = `
+      SELECT 
+        i.*,
+        p.name AS project_name,
+        p.prefix AS project_prefix,
+        p.color AS project_color,
+        p.visibility AS project_visibility,
+        p.purpose AS project_purpose
+      FROM icons i
+      JOIN projects p ON p.id = i.project_id
+      ${whereClause}
+      ORDER BY i.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const icons = db.prepare(selectSql).all(...params, limit, offset) as any[];
     return { icons, total };
   },
 

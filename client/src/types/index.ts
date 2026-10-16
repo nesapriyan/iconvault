@@ -69,6 +69,14 @@ export interface IconItem {
   versions?: IconVersion[];
 }
 
+export interface GlobalSearchIconItem extends IconItem {
+  project_name: string;
+  project_prefix: string;
+  project_color: string;
+  project_visibility: 'public' | 'private';
+  project_purpose?: 'sprite' | 'font';
+}
+
 export interface IconVersion {
   id: string;
   icon_id: string;

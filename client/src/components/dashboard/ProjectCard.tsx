@@ -28,7 +28,7 @@ const AVATAR_GRADIENTS = [
   'bg-gradient-to-tr from-red-600 to-orange-500 shadow-red-500/20'
 ];
 
-function getAvatarStyle(project: Project): { className: string; style?: React.CSSProperties } {
+export function getAvatarStyle(project: { id?: string; name?: string; color?: string }): { className: string; style?: React.CSSProperties } {
   if (project.color && project.color !== '#3b82f6') {
     return {
       className: 'shadow-xs',
